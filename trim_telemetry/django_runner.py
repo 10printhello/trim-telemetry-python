@@ -19,6 +19,8 @@ class TrimTelemetryRunner(DiscoverRunner):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.telemetry_collector = BaseTelemetryCollector()
+        # Generate unique run ID for this test run
+        self.run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         # Block network calls
         self.original_socket = self.telemetry_collector.block_network_calls()
         # Track query counts per test for isolation
@@ -102,6 +104,7 @@ class TrimTelemetryRunner(DiscoverRunner):
 
                     # Create rich telemetry data
                     test_telemetry = {
+                        "run_id": self.runner.run_id,
                         "id": test_id,
                         "name": getattr(test, "_testMethodName", test_id),
                         "class": test.__class__.__name__,
@@ -264,6 +267,7 @@ class TrimTelemetryRunner(DiscoverRunner):
             skipped_tests = len(result.skipped) if hasattr(result, "skipped") else 0
 
             summary_data = {
+                "run_id": self.run_id,
                 "type": "test_run_summary",
                 "total_tests": total_tests,
                 "passed_tests": passed_tests,
@@ -280,6 +284,7 @@ class TrimTelemetryRunner(DiscoverRunner):
             # Output a summary even if there was an error
             if summary_data is None:
                 summary_data = {
+                    "run_id": self.run_id,
                     "type": "test_run_summary",
                     "total_tests": 0,
                     "passed_tests": 0,
