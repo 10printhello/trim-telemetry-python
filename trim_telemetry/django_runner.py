@@ -3,11 +3,11 @@ Django test runner with rich telemetry collection
 """
 
 import json
+import os
 import time
 import unittest
 from datetime import datetime
 from django.test.runner import DiscoverRunner
-from django.test.utils import CaptureQueriesContext
 from django.db import connection
 from .base_collector import BaseTelemetryCollector
 
@@ -208,8 +208,6 @@ class TrimTelemetryRunner(DiscoverRunner):
 
             # Also write to a local file as backup
             try:
-                import os
-
                 summary_file = os.path.join(os.getcwd(), "test_summary.json")
                 with open(summary_file, "w") as f:
                     f.write(json.dumps(summary_data, indent=2))
@@ -239,8 +237,6 @@ class TrimTelemetryRunner(DiscoverRunner):
 
             # Also write to a local file as backup
             try:
-                import os
-
                 summary_file = os.path.join(os.getcwd(), "test_summary.json")
                 with open(summary_file, "w") as f:
                     f.write(json.dumps(summary_data, indent=2))
