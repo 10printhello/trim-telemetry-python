@@ -9,6 +9,7 @@ import unittest
 from datetime import datetime
 from django.test.runner import DiscoverRunner
 from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from .base_collector import BaseTelemetryCollector
 
 # Try to import coverage tools
@@ -30,6 +31,8 @@ class TrimTelemetryRunner(DiscoverRunner):
         self.original_socket = self.telemetry_collector.block_network_calls()
         # Track query counts per test for isolation
         self.test_query_counts = {}
+        # Track query contexts for each test
+        self.test_query_contexts = {}
         # Initialize coverage collection
         self.coverage_collector = self._init_coverage_collector()
         self.test_coverage_data = {}
@@ -49,9 +52,12 @@ class TrimTelemetryRunner(DiscoverRunner):
             def startTest(self, test):
                 super().startTest(test)
                 self.telemetry_collector.start_test(test)
-                # Capture initial query count for this test
+                # Start query capture for this test
                 test_id = str(test)
-                self.runner.test_query_counts[test_id] = len(connection.queries)
+                # Use CaptureQueriesContext for more reliable query capture
+                query_context = CaptureQueriesContext(connection)
+                query_context.__enter__()
+                self.runner.test_query_contexts[test_id] = query_context
                 # Start coverage collection for this test
                 self.runner._start_test_coverage(test_id)
 
@@ -74,12 +80,25 @@ class TrimTelemetryRunner(DiscoverRunner):
             def stopTest(self, test):
                 # Get database query info for THIS test only
                 test_id = str(test)
-                initial_query_count = self.runner.test_query_counts.get(test_id, 0)
 
-                # Calculate queries executed during this test
-                test_queries = connection.queries[initial_query_count:]
-                queries = len(test_queries)
-                query_time = sum(float(q["time"]) for q in test_queries)
+                # Get captured queries for this test
+                query_context = self.runner.test_query_contexts.get(test_id)
+                if query_context:
+                    query_context.__exit__(None, None, None)
+                    test_queries = query_context.captured_queries
+                    queries = len(test_queries)
+                    query_time = sum(float(q["time"]) for q in test_queries)
+                else:
+                    # Fallback to connection.queries if CaptureQueriesContext failed
+                    test_queries = connection.queries
+                    queries = len(test_queries)
+                    query_time = sum(float(q["time"]) for q in test_queries)
+
+                # Debug: Log query information
+                print(
+                    f"DEBUG: Test {test_id} - Captured queries: {queries}, Query time: {query_time}ms",
+                    flush=True,
+                )
 
                 # Get test timing
                 if self.telemetry_collector.current_test_start:
