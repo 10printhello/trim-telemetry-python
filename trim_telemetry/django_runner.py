@@ -166,6 +166,22 @@ class TrimTelemetryRunner(DiscoverRunner):
 
     def run_tests(self, test_labels=None, **kwargs):
         """Run tests with telemetry collection."""
+        import signal
+        import sys
+        
+        # Store the summary data to output it even if we get terminated
+        summary_data = None
+        
+        def signal_handler(signum, frame):
+            """Handle termination signals to ensure TEST_SUMMARY is output."""
+            if summary_data:
+                print(f"TEST_SUMMARY:{json.dumps(summary_data)}", flush=True)
+            sys.exit(0)
+        
+        # Register signal handlers
+        signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        
         self.telemetry_collector.start_test_run()
 
         try:
@@ -179,7 +195,7 @@ class TrimTelemetryRunner(DiscoverRunner):
             failed_tests = len(result.failures) + len(result.errors)
             skipped_tests = len(result.skipped) if hasattr(result, "skipped") else 0
 
-            summary = {
+            summary_data = {
                 "type": "test_run_summary",
                 "total_tests": total_tests,
                 "passed_tests": passed_tests,
@@ -187,9 +203,26 @@ class TrimTelemetryRunner(DiscoverRunner):
                 "skipped_tests": skipped_tests,
                 "exit_code": 0 if result.wasSuccessful() else 1,
             }
-            print(f"TEST_SUMMARY:{json.dumps(summary)}")
+            print(f"TEST_SUMMARY:{json.dumps(summary_data)}", flush=True)
+            print("DEBUG: TEST_SUMMARY output completed", flush=True)
 
             return len(result.failures) + len(result.errors)
+
+        except Exception as e:
+            # Output a summary even if there was an error
+            if summary_data is None:
+                summary_data = {
+                    "type": "test_run_summary",
+                    "total_tests": 0,
+                    "passed_tests": 0,
+                    "failed_tests": 1,
+                    "skipped_tests": 0,
+                    "exit_code": 1,
+                    "error": str(e)
+                }
+            print(f"TEST_SUMMARY:{json.dumps(summary_data)}", flush=True)
+            print(f"DEBUG: Error occurred: {e}", flush=True)
+            raise
 
         finally:
             # Restore network calls
