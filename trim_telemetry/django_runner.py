@@ -168,20 +168,20 @@ class TrimTelemetryRunner(DiscoverRunner):
         """Run tests with telemetry collection."""
         import signal
         import sys
-        
+
         # Store the summary data to output it even if we get terminated
         summary_data = None
-        
+
         def signal_handler(signum, frame):
             """Handle termination signals to ensure TEST_SUMMARY is output."""
             if summary_data:
                 print(f"TEST_SUMMARY:{json.dumps(summary_data)}", flush=True)
             sys.exit(0)
-        
+
         # Register signal handlers
         signal.signal(signal.SIGTERM, signal_handler)
         signal.signal(signal.SIGINT, signal_handler)
-        
+
         self.telemetry_collector.start_test_run()
 
         try:
@@ -218,7 +218,7 @@ class TrimTelemetryRunner(DiscoverRunner):
                     "failed_tests": 1,
                     "skipped_tests": 0,
                     "exit_code": 1,
-                    "error": str(e)
+                    "error": str(e),
                 }
             print(f"TEST_SUMMARY:{json.dumps(summary_data)}", flush=True)
             print(f"DEBUG: Error occurred: {e}", flush=True)
