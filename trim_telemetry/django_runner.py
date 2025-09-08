@@ -40,9 +40,10 @@ class TrimTelemetryRunner(DiscoverRunner):
         """Run test suite with instrumentation."""
 
         class InstrumentedTestResult(unittest.TextTestResult):
-            def __init__(self, telemetry_collector, *args, **kwargs):
+            def __init__(self, telemetry_collector, runner, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 self.telemetry_collector = telemetry_collector
+                self.runner = runner
                 self.test_status = {}
 
             def startTest(self, test):
@@ -50,9 +51,9 @@ class TrimTelemetryRunner(DiscoverRunner):
                 self.telemetry_collector.start_test(test)
                 # Capture initial query count for this test
                 test_id = str(test)
-                self.test_query_counts[test_id] = len(connection.queries)
+                self.runner.test_query_counts[test_id] = len(connection.queries)
                 # Start coverage collection for this test
-                self._start_test_coverage(test_id)
+                self.runner._start_test_coverage(test_id)
 
             def addSuccess(self, test):
                 super().addSuccess(test)
@@ -73,7 +74,7 @@ class TrimTelemetryRunner(DiscoverRunner):
             def stopTest(self, test):
                 # Get database query info for THIS test only
                 test_id = str(test)
-                initial_query_count = self.test_query_counts.get(test_id, 0)
+                initial_query_count = self.runner.test_query_counts.get(test_id, 0)
 
                 # Calculate queries executed during this test
                 test_queries = connection.queries[initial_query_count:]
@@ -87,7 +88,7 @@ class TrimTelemetryRunner(DiscoverRunner):
                     duration = (end_time - start_time) * 1000  # Convert to milliseconds
 
                     # Track duration for percentile calculations
-                    self.test_durations.append(duration)
+                    self.runner.test_durations.append(duration)
 
                     # Get test status
                     test_id = str(test)
@@ -107,7 +108,7 @@ class TrimTelemetryRunner(DiscoverRunner):
                         "end_time": datetime.fromtimestamp(end_time).isoformat(),
                         "tags": [],
                         "fixtures": [],
-                        "database_queries": self._analyze_database_queries(
+                        "database_queries": self.runner._analyze_database_queries(
                             test_queries, query_time
                         ),
                         "http_calls": {
@@ -130,16 +131,16 @@ class TrimTelemetryRunner(DiscoverRunner):
                             )
                             > 0,
                             "current_duration": round(duration),
-                            "avg_duration": self._calculate_average_duration(),
-                            "median_duration": self._calculate_percentile(50),
-                            "p95_duration": self._calculate_percentile(95),
-                            "p99_duration": self._calculate_percentile(99),
-                            "total_tests_run": len(self.test_durations),
-                            "flags": self._generate_performance_flags(
+                            "avg_duration": self.runner._calculate_average_duration(),
+                            "median_duration": self.runner._calculate_percentile(50),
+                            "p95_duration": self.runner._calculate_percentile(95),
+                            "p99_duration": self.runner._calculate_percentile(99),
+                            "total_tests_run": len(self.runner.test_durations),
+                            "flags": self.runner._generate_performance_flags(
                                 duration, queries, test_queries
                             ),
                         },
-                        "coverage": self._collect_test_coverage(test_id),
+                        "coverage": self.runner._collect_test_coverage(test_id),
                         "logs": [],
                         "metadata": {},
                     }
@@ -156,7 +157,7 @@ class TrimTelemetryRunner(DiscoverRunner):
         runner = unittest.TextTestRunner(
             verbosity=self.verbosity,
             resultclass=lambda *args, **kwargs: InstrumentedTestResult(
-                self.telemetry_collector, *args, **kwargs
+                self.telemetry_collector, self, *args, **kwargs
             ),
         )
 
