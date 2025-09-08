@@ -131,8 +131,6 @@ class TrimTelemetryRunner(DiscoverRunner):
                         "test_performance": {
                             "duration_ms": round(duration),
                         },
-                        "logs": [],
-                        "metadata": {},
                     }
 
                     # Output telemetry data
