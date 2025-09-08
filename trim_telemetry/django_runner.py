@@ -127,27 +127,22 @@ class TrimTelemetryRunner(DiscoverRunner):
                         "end_time": datetime.fromtimestamp(end_time).isoformat(),
                         "tags": [],
                         "fixtures": [],
-                        "database_queries": self.runner._analyze_database_queries(
+                        "database": self.runner._analyze_database_queries(
                             test_queries, query_time
                         ),
-                        "http_calls": {
-                            "count": len(
+                        "network": {
+                            "calls_attempted": len(
+                                self.telemetry_collector.network_call_attempts
+                            ),
+                            "calls_blocked": len(
                                 self.telemetry_collector.network_call_attempts
                             ),
                             "total_duration": 0,
                             "external_calls": self.telemetry_collector.network_call_attempts.copy(),
                             "blocked_calls": self.telemetry_collector.network_call_attempts.copy(),
                         },
-                        "performance": {
+                        "test_performance": {
                             "duration_ms": round(duration),
-                            "database_queries_count": queries,
-                            "database_queries_duration_ms": round(query_time * 1000),
-                            "network_calls_attempted": len(
-                                self.telemetry_collector.network_call_attempts
-                            ),
-                            "network_calls_blocked": len(
-                                self.telemetry_collector.network_call_attempts
-                            ),
                         },
                         "coverage": self.runner._collect_test_coverage(test_id),
                         "logs": [],
