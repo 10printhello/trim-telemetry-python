@@ -20,6 +20,8 @@ class TrimTelemetryRunner(DiscoverRunner):
         self.telemetry_collector = BaseTelemetryCollector()
         # Block network calls
         self.original_socket = self.telemetry_collector.block_network_calls()
+        # Track query counts per test for isolation
+        self.test_query_counts = {}
 
     def run_suite(self, suite, **kwargs):
         """Run test suite with instrumentation."""
@@ -33,6 +35,9 @@ class TrimTelemetryRunner(DiscoverRunner):
             def startTest(self, test):
                 super().startTest(test)
                 self.telemetry_collector.start_test(test)
+                # Capture initial query count for this test
+                test_id = str(test)
+                self.test_query_counts[test_id] = len(connection.queries)
 
             def addSuccess(self, test):
                 super().addSuccess(test)
@@ -51,9 +56,14 @@ class TrimTelemetryRunner(DiscoverRunner):
                 self.test_status[str(test)] = "skipped"
 
             def stopTest(self, test):
-                # Get database query info
-                queries = len(connection.queries)
-                query_time = sum(float(q["time"]) for q in connection.queries)
+                # Get database query info for THIS test only
+                test_id = str(test)
+                initial_query_count = self.test_query_counts.get(test_id, 0)
+
+                # Calculate queries executed during this test
+                test_queries = connection.queries[initial_query_count:]
+                queries = len(test_queries)
+                query_time = sum(float(q["time"]) for q in test_queries)
 
                 # Get test timing
                 if self.telemetry_collector.current_test_start:
@@ -79,22 +89,9 @@ class TrimTelemetryRunner(DiscoverRunner):
                         "end_time": datetime.fromtimestamp(end_time).isoformat(),
                         "tags": [],
                         "fixtures": [],
-                        "database_queries": {
-                            "count": queries,
-                            "total_duration": round(
-                                query_time * 1000
-                            ),  # Convert to milliseconds
-                            "slow_queries": [
-                                {
-                                    "sql": q["sql"],
-                                    "time": float(q["time"]),
-                                    "duration": round(float(q["time"]) * 1000),
-                                }
-                                for q in connection.queries
-                                if float(q["time"]) > 0.1  # Slow queries > 100ms
-                            ],
-                            "duplicate_queries": [],
-                        },
+                        "database_queries": self._analyze_database_queries(
+                            test_queries, query_time
+                        ),
                         "http_calls": {
                             "count": len(
                                 self.telemetry_collector.network_call_attempts
@@ -116,7 +113,9 @@ class TrimTelemetryRunner(DiscoverRunner):
                             > 0,
                             "p95_duration": round(duration),
                             "p99_duration": round(duration),
-                            "flags": [],
+                            "flags": self._generate_performance_flags(
+                                duration, queries, test_queries
+                            ),
                         },
                         "coverage": {
                             "lines_covered": 0,
@@ -127,24 +126,6 @@ class TrimTelemetryRunner(DiscoverRunner):
                         "logs": [],
                         "metadata": {},
                     }
-
-                    # Add performance flags
-                    if duration > 5000:
-                        test_telemetry["performance"]["flags"].append("very_slow")
-                    elif duration > 1000:
-                        test_telemetry["performance"]["flags"].append("slow")
-
-                    if queries > 100:
-                        test_telemetry["performance"]["flags"].append("high_db_queries")
-                    elif queries > 50:
-                        test_telemetry["performance"]["flags"].append(
-                            "moderate_db_queries"
-                        )
-
-                    if len(self.telemetry_collector.network_call_attempts) > 0:
-                        test_telemetry["performance"]["flags"].append(
-                            "network_calls_blocked"
-                        )
 
                     # Output telemetry data
                     print(f"TEST_RESULT:{json.dumps(test_telemetry)}")
@@ -163,6 +144,118 @@ class TrimTelemetryRunner(DiscoverRunner):
         )
 
         return runner.run(suite)
+
+    def _analyze_database_queries(self, test_queries, total_query_time):
+        """Analyze database queries for rich telemetry data."""
+        if not test_queries:
+            return {
+                "count": 0,
+                "total_duration": 0,
+                "slow_queries": [],
+                "duplicate_queries": [],
+                "query_types": {
+                    "SELECT": 0,
+                    "INSERT": 0,
+                    "UPDATE": 0,
+                    "DELETE": 0,
+                    "OTHER": 0,
+                },
+                "avg_duration": 0,
+                "max_duration": 0,
+            }
+
+        # Analyze query types
+        query_types = {"SELECT": 0, "INSERT": 0, "UPDATE": 0, "DELETE": 0, "OTHER": 0}
+        slow_queries = []
+        query_durations = []
+        sql_queries = {}  # For duplicate detection
+
+        for query in test_queries:
+            sql = query["sql"].strip().upper()
+            duration = float(query["time"])
+            query_durations.append(duration)
+
+            # Categorize query type
+            if sql.startswith("SELECT"):
+                query_types["SELECT"] += 1
+            elif sql.startswith("INSERT"):
+                query_types["INSERT"] += 1
+            elif sql.startswith("UPDATE"):
+                query_types["UPDATE"] += 1
+            elif sql.startswith("DELETE"):
+                query_types["DELETE"] += 1
+            else:
+                query_types["OTHER"] += 1
+
+            # Track slow queries (> 100ms)
+            if duration > 0.1:
+                slow_queries.append(
+                    {
+                        "sql": query["sql"],
+                        "time": duration,
+                        "duration": round(duration * 1000),  # Convert to milliseconds
+                    }
+                )
+
+            # Track duplicate queries (same SQL)
+            if sql in sql_queries:
+                sql_queries[sql] += 1
+            else:
+                sql_queries[sql] = 1
+
+        # Find duplicate queries
+        duplicate_queries = [
+            {"sql": sql, "count": count}
+            for sql, count in sql_queries.items()
+            if count > 1
+        ]
+
+        return {
+            "count": len(test_queries),
+            "total_duration": round(total_query_time * 1000),  # Convert to milliseconds
+            "slow_queries": slow_queries,
+            "duplicate_queries": duplicate_queries,
+            "query_types": query_types,
+            "avg_duration": round(
+                (sum(query_durations) / len(query_durations)) * 1000, 2
+            ),
+            "max_duration": round(max(query_durations) * 1000, 2),
+        }
+
+    def _generate_performance_flags(self, duration, query_count, test_queries):
+        """Generate performance flags based on test metrics."""
+        flags = []
+
+        # Duration flags
+        if duration > 5000:
+            flags.append("very_slow")
+        elif duration > 1000:
+            flags.append("slow")
+
+        # Database query flags
+        if query_count > 100:
+            flags.append("high_db_queries")
+        elif query_count > 50:
+            flags.append("moderate_db_queries")
+
+        # Network call flags
+        if len(self.telemetry_collector.network_call_attempts) > 0:
+            flags.append("network_calls_blocked")
+
+        # Query-specific flags
+        if test_queries:
+            slow_query_count = len([q for q in test_queries if float(q["time"]) > 0.1])
+            if slow_query_count > 0:
+                flags.append(f"has_slow_queries_{slow_query_count}")
+
+            # Check for N+1 query patterns (multiple similar SELECT queries)
+            select_queries = [
+                q for q in test_queries if q["sql"].strip().upper().startswith("SELECT")
+            ]
+            if len(select_queries) > 10:
+                flags.append("potential_n_plus_1_queries")
+
+        return flags
 
     def run_tests(self, test_labels=None, **kwargs):
         """Run tests with telemetry collection."""
