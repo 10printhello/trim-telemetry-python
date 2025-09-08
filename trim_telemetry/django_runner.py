@@ -12,14 +12,6 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from .base_collector import BaseTelemetryCollector
 
-# Try to import coverage tools
-try:
-    import coverage
-
-    COVERAGE_AVAILABLE = True
-except ImportError:
-    COVERAGE_AVAILABLE = False
-
 
 class TrimTelemetryRunner(DiscoverRunner):
     """Django test runner with rich telemetry collection."""
@@ -33,9 +25,6 @@ class TrimTelemetryRunner(DiscoverRunner):
         self.test_query_counts = {}
         # Track query contexts for each test
         self.test_query_contexts = {}
-        # Initialize coverage collection
-        self.coverage_collector = self._init_coverage_collector()
-        self.test_coverage_data = {}
         # Track test durations for percentile calculations
         self.test_durations = []
 
@@ -58,8 +47,6 @@ class TrimTelemetryRunner(DiscoverRunner):
                 query_context = CaptureQueriesContext(connection)
                 query_context.__enter__()
                 self.runner.test_query_contexts[test_id] = query_context
-                # Start coverage collection for this test
-                self.runner._start_test_coverage(test_id)
 
             def addSuccess(self, test):
                 super().addSuccess(test)
@@ -144,7 +131,6 @@ class TrimTelemetryRunner(DiscoverRunner):
                         "test_performance": {
                             "duration_ms": round(duration),
                         },
-                        "coverage": self.runner._collect_test_coverage(test_id),
                         "logs": [],
                         "metadata": {},
                     }
@@ -248,143 +234,6 @@ class TrimTelemetryRunner(DiscoverRunner):
             "max_duration_ms": round(max(query_durations) * 1000),
         }
 
-    def _init_coverage_collector(self):
-        """Initialize coverage collection if available."""
-        if not COVERAGE_AVAILABLE:
-            return None
-
-        try:
-            # Create coverage instance
-            cov = coverage.Coverage(
-                source=["."],  # Cover current directory
-                omit=[
-                    "*/tests/*",
-                    "*/test_*",
-                    "*/migrations/*",
-                    "*/venv/*",
-                    "*/env/*",
-                    "*/__pycache__/*",
-                    "*/node_modules/*",
-                ],
-            )
-            return cov
-        except Exception as e:
-            print(f"DEBUG: Failed to initialize coverage: {e}", flush=True)
-            return None
-
-    def _start_test_coverage(self, test_id):
-        """Start coverage collection for a specific test."""
-        if not self.coverage_collector:
-            return
-
-        try:
-            # Start coverage collection
-            self.coverage_collector.start()
-            self.test_coverage_data[test_id] = {
-                "started": True,
-                "start_time": time.time(),
-            }
-        except Exception as e:
-            print(
-                f"DEBUG: Failed to start coverage for test {test_id}: {e}", flush=True
-            )
-
-    def _collect_test_coverage(self, test_id):
-        """Collect coverage data for a specific test."""
-        if not self.coverage_collector or test_id not in self.test_coverage_data:
-            return {
-                "lines_covered": 0,
-                "lines_total": 0,
-                "coverage_percent": 0.0,
-                "files": [],
-                "status": "not_available",
-            }
-
-        try:
-            # Stop coverage collection
-            self.coverage_collector.stop()
-
-            # Get coverage data
-            coverage_data = self.coverage_collector.get_data()
-
-            # Calculate coverage metrics
-            total_lines = 0
-            covered_lines = 0
-            file_coverage = []
-
-            for filename in coverage_data.measured_files():
-                if not filename.endswith(".py"):
-                    continue
-
-                # Get line coverage for this file using Analysis
-                try:
-                    from coverage.analysis import Analysis
-
-                    analysis = Analysis(coverage_data, filename)
-                    lines = analysis.statements
-                    missing = analysis.missing
-
-                    if lines:
-                        file_total = len(lines)
-                        file_covered = file_total - len(missing)
-                    else:
-                        continue
-                except Exception:
-                    # Fallback to basic coverage data
-                    lines = coverage_data.lines(filename)
-                    if lines:
-                        file_total = len(lines)
-                        file_covered = file_total  # Assume all lines covered if we can't get missing
-                    else:
-                        continue
-
-                total_lines += file_total
-                covered_lines += file_covered
-
-                file_coverage.append(
-                    {
-                        "file": filename,
-                        "lines_covered": file_covered,
-                        "lines_total": file_total,
-                        "coverage_percent": round((file_covered / file_total) * 100, 2)
-                        if file_total > 0
-                        else 0,
-                        "missing_lines": list(missing)
-                        if "missing" in locals() and missing
-                        else [],
-                    }
-                )
-
-            coverage_percent = (
-                round((covered_lines / total_lines) * 100, 2)
-                if total_lines > 0
-                else 0.0
-            )
-
-            # Restart coverage for next test
-            self.coverage_collector.start()
-
-            return {
-                "lines_covered": covered_lines,
-                "lines_total": total_lines,
-                "coverage_percent": coverage_percent,
-                "files": file_coverage,
-                "status": "collected",
-            }
-
-        except Exception as e:
-            print(
-                f"DEBUG: Failed to collect coverage for test {test_id}: {e}", flush=True
-            )
-            return {
-                "lines_covered": 0,
-                "lines_total": 0,
-                "coverage_percent": 0.0,
-                "files": [],
-                "status": "error",
-                "error": str(e),
-            }
-
     def run_tests(self, test_labels=None, **kwargs):
         """Run tests with telemetry collection."""
         import signal
@@ -448,9 +297,3 @@ class TrimTelemetryRunner(DiscoverRunner):
         finally:
             # Restore network calls
             self.telemetry_collector.restore_network_calls(self.original_socket)
-            # Clean up coverage collection
-            if self.coverage_collector:
-                try:
-                    self.coverage_collector.stop()
-                except Exception as e:
-                    print(f"DEBUG: Error stopping coverage collector: {e}", flush=True)
