@@ -381,7 +381,7 @@ class TrimTelemetryRunner(DiscoverRunner):
 
                 # Get line coverage for this file
                 lines = coverage_data.lines(filename)
-                missing = coverage_data.missing_lines(filename)
+                missing = coverage_data.missing(filename)
 
                 if lines:
                     file_total = len(lines)
@@ -400,7 +400,7 @@ class TrimTelemetryRunner(DiscoverRunner):
                             )
                             if file_total > 0
                             else 0,
-                            "missing_lines": list(missing),
+                            "missing_lines": list(missing) if missing else [],
                         }
                     )
 
