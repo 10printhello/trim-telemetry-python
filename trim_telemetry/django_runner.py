@@ -382,10 +382,11 @@ class TrimTelemetryRunner(DiscoverRunner):
                 # Get line coverage for this file using Analysis
                 try:
                     from coverage.analysis import Analysis
+
                     analysis = Analysis(coverage_data, filename)
                     lines = analysis.statements
                     missing = analysis.missing
-                    
+
                     if lines:
                         file_total = len(lines)
                         file_covered = file_total - len(missing)
@@ -404,18 +405,18 @@ class TrimTelemetryRunner(DiscoverRunner):
                 covered_lines += file_covered
 
                 file_coverage.append(
-                        {
-                            "file": filename,
-                            "lines_covered": file_covered,
-                            "lines_total": file_total,
-                            "coverage_percent": round(
-                                (file_covered / file_total) * 100, 2
-                            )
-                            if file_total > 0
-                            else 0,
-                            "missing_lines": list(missing) if 'missing' in locals() and missing else [],
-                        }
-                    )
+                    {
+                        "file": filename,
+                        "lines_covered": file_covered,
+                        "lines_total": file_total,
+                        "coverage_percent": round((file_covered / file_total) * 100, 2)
+                        if file_total > 0
+                        else 0,
+                        "missing_lines": list(missing)
+                        if "missing" in locals() and missing
+                        else [],
+                    }
+                )
 
             coverage_percent = (
                 round((covered_lines / total_lines) * 100, 2)
