@@ -169,21 +169,27 @@ class TrimTelemetryRunner(DiscoverRunner):
         self.telemetry_collector.start_test_run()
 
         try:
-            # Run tests with instrumentation
-            result = super().run_tests(test_labels, **kwargs)
+            # Run tests with instrumentation using run_suite to get proper test result
+            suite = self.build_suite(test_labels)
+            result = self.run_suite(suite)
 
-            # Output final summary - result is an integer (number of failures)
-            # We need to get the actual test result from the suite run
+            # Output final summary with proper test counts
+            total_tests = result.testsRun
+            passed_tests = total_tests - len(result.failures) - len(result.errors)
+            failed_tests = len(result.failures) + len(result.errors)
+            skipped_tests = len(result.skipped) if hasattr(result, "skipped") else 0
+
             summary = {
-                "total_tests": 0,  # Will be updated by individual test results
-                "passed_tests": 0,
-                "failed_tests": result,  # result is the number of failures
-                "skipped_tests": 0,
-                "exit_code": 0 if result == 0 else 1,
+                "type": "test_run_summary",
+                "total_tests": total_tests,
+                "passed_tests": passed_tests,
+                "failed_tests": failed_tests,
+                "skipped_tests": skipped_tests,
+                "exit_code": 0 if result.wasSuccessful() else 1,
             }
             print(f"TEST_SUMMARY:{json.dumps(summary)}")
 
-            return result
+            return len(result.failures) + len(result.errors)
 
         finally:
             # Restore network calls
