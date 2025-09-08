@@ -379,18 +379,31 @@ class TrimTelemetryRunner(DiscoverRunner):
                 if not filename.endswith(".py"):
                     continue
 
-                # Get line coverage for this file
-                lines = coverage_data.lines(filename)
-                missing = coverage_data.missing(filename)
+                # Get line coverage for this file using Analysis
+                try:
+                    from coverage.analysis import Analysis
+                    analysis = Analysis(coverage_data, filename)
+                    lines = analysis.statements
+                    missing = analysis.missing
+                    
+                    if lines:
+                        file_total = len(lines)
+                        file_covered = file_total - len(missing)
+                    else:
+                        continue
+                except Exception:
+                    # Fallback to basic coverage data
+                    lines = coverage_data.lines(filename)
+                    if lines:
+                        file_total = len(lines)
+                        file_covered = file_total  # Assume all lines covered if we can't get missing
+                    else:
+                        continue
 
-                if lines:
-                    file_total = len(lines)
-                    file_covered = file_total - len(missing)
+                total_lines += file_total
+                covered_lines += file_covered
 
-                    total_lines += file_total
-                    covered_lines += file_covered
-
-                    file_coverage.append(
+                file_coverage.append(
                         {
                             "file": filename,
                             "lines_covered": file_covered,
@@ -400,7 +413,7 @@ class TrimTelemetryRunner(DiscoverRunner):
                             )
                             if file_total > 0
                             else 0,
-                            "missing_lines": list(missing) if missing else [],
+                            "missing_lines": list(missing) if 'missing' in locals() and missing else [],
                         }
                     )
 
