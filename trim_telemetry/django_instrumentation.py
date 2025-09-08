@@ -4,6 +4,7 @@ Django test instrumentation for rich telemetry collection
 
 import os
 import sys
+import time
 import argparse
 from typing import Optional
 
