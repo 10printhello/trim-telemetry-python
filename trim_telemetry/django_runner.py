@@ -172,18 +172,14 @@ class TrimTelemetryRunner(DiscoverRunner):
             # Run tests with instrumentation
             result = super().run_tests(test_labels, **kwargs)
 
-            # Output final summary
-            total_tests = result.testsRun
-            passed_tests = total_tests - len(result.failures) - len(result.errors)
-            failed_tests = len(result.failures) + len(result.errors)
-            skipped_tests = len(result.skipped) if hasattr(result, "skipped") else 0
-
+            # Output final summary - result is an integer (number of failures)
+            # We need to get the actual test result from the suite run
             summary = {
-                "total_tests": total_tests,
-                "passed_tests": passed_tests,
-                "failed_tests": failed_tests,
-                "skipped_tests": skipped_tests,
-                "exit_code": 0 if result.wasSuccessful() else 1,
+                "total_tests": 0,  # Will be updated by individual test results
+                "passed_tests": 0,
+                "failed_tests": result,  # result is the number of failures
+                "skipped_tests": 0,
+                "exit_code": 0 if result == 0 else 1,
             }
             print(f"TEST_SUMMARY:{json.dumps(summary)}")
 
