@@ -11,6 +11,14 @@ from django.test.runner import DiscoverRunner
 from django.db import connection
 from .base_collector import BaseTelemetryCollector
 
+# Try to import coverage tools
+try:
+    import coverage
+
+    COVERAGE_AVAILABLE = True
+except ImportError:
+    COVERAGE_AVAILABLE = False
+
 
 class TrimTelemetryRunner(DiscoverRunner):
     """Django test runner with rich telemetry collection."""
@@ -22,6 +30,11 @@ class TrimTelemetryRunner(DiscoverRunner):
         self.original_socket = self.telemetry_collector.block_network_calls()
         # Track query counts per test for isolation
         self.test_query_counts = {}
+        # Initialize coverage collection
+        self.coverage_collector = self._init_coverage_collector()
+        self.test_coverage_data = {}
+        # Track test durations for percentile calculations
+        self.test_durations = []
 
     def run_suite(self, suite, **kwargs):
         """Run test suite with instrumentation."""
@@ -38,6 +51,8 @@ class TrimTelemetryRunner(DiscoverRunner):
                 # Capture initial query count for this test
                 test_id = str(test)
                 self.test_query_counts[test_id] = len(connection.queries)
+                # Start coverage collection for this test
+                self._start_test_coverage(test_id)
 
             def addSuccess(self, test):
                 super().addSuccess(test)
@@ -70,6 +85,9 @@ class TrimTelemetryRunner(DiscoverRunner):
                     end_time = time.time()
                     start_time = self.telemetry_collector.current_test_start
                     duration = (end_time - start_time) * 1000  # Convert to milliseconds
+
+                    # Track duration for percentile calculations
+                    self.test_durations.append(duration)
 
                     # Get test status
                     test_id = str(test)
@@ -111,18 +129,17 @@ class TrimTelemetryRunner(DiscoverRunner):
                                 self.telemetry_collector.network_call_attempts
                             )
                             > 0,
-                            "p95_duration": round(duration),
-                            "p99_duration": round(duration),
+                            "current_duration": round(duration),
+                            "avg_duration": self._calculate_average_duration(),
+                            "median_duration": self._calculate_percentile(50),
+                            "p95_duration": self._calculate_percentile(95),
+                            "p99_duration": self._calculate_percentile(99),
+                            "total_tests_run": len(self.test_durations),
                             "flags": self._generate_performance_flags(
                                 duration, queries, test_queries
                             ),
                         },
-                        "coverage": {
-                            "lines_covered": 0,
-                            "lines_total": 0,
-                            "coverage_percent": 0.0,
-                            "files": [],
-                        },
+                        "coverage": self._collect_test_coverage(test_id),
                         "logs": [],
                         "metadata": {},
                     }
@@ -257,6 +274,165 @@ class TrimTelemetryRunner(DiscoverRunner):
 
         return flags
 
+    def _calculate_percentile(self, percentile):
+        """Calculate percentile from test durations."""
+        if not self.test_durations:
+            return 0
+
+        # Sort durations
+        sorted_durations = sorted(self.test_durations)
+        n = len(sorted_durations)
+
+        if n == 1:
+            return round(sorted_durations[0])
+
+        # Calculate percentile index
+        index = (percentile / 100.0) * (n - 1)
+
+        if index.is_integer():
+            # Exact index
+            return round(sorted_durations[int(index)])
+        else:
+            # Interpolate between two values
+            lower_index = int(index)
+            upper_index = lower_index + 1
+            weight = index - lower_index
+
+            lower_value = sorted_durations[lower_index]
+            upper_value = sorted_durations[upper_index]
+
+            interpolated = lower_value + weight * (upper_value - lower_value)
+            return round(interpolated)
+
+    def _calculate_average_duration(self):
+        """Calculate average duration from test durations."""
+        if not self.test_durations:
+            return 0
+        return round(sum(self.test_durations) / len(self.test_durations))
+
+    def _init_coverage_collector(self):
+        """Initialize coverage collection if available."""
+        if not COVERAGE_AVAILABLE:
+            return None
+
+        try:
+            # Create coverage instance
+            cov = coverage.Coverage(
+                source=["."],  # Cover current directory
+                omit=[
+                    "*/tests/*",
+                    "*/test_*",
+                    "*/migrations/*",
+                    "*/venv/*",
+                    "*/env/*",
+                    "*/__pycache__/*",
+                    "*/node_modules/*",
+                ],
+            )
+            return cov
+        except Exception as e:
+            print(f"DEBUG: Failed to initialize coverage: {e}", flush=True)
+            return None
+
+    def _start_test_coverage(self, test_id):
+        """Start coverage collection for a specific test."""
+        if not self.coverage_collector:
+            return
+
+        try:
+            # Start coverage collection
+            self.coverage_collector.start()
+            self.test_coverage_data[test_id] = {
+                "started": True,
+                "start_time": time.time(),
+            }
+        except Exception as e:
+            print(
+                f"DEBUG: Failed to start coverage for test {test_id}: {e}", flush=True
+            )
+
+    def _collect_test_coverage(self, test_id):
+        """Collect coverage data for a specific test."""
+        if not self.coverage_collector or test_id not in self.test_coverage_data:
+            return {
+                "lines_covered": 0,
+                "lines_total": 0,
+                "coverage_percent": 0.0,
+                "files": [],
+                "status": "not_available",
+            }
+
+        try:
+            # Stop coverage collection
+            self.coverage_collector.stop()
+
+            # Get coverage data
+            coverage_data = self.coverage_collector.get_data()
+
+            # Calculate coverage metrics
+            total_lines = 0
+            covered_lines = 0
+            file_coverage = []
+
+            for filename in coverage_data.measured_files():
+                if not filename.endswith(".py"):
+                    continue
+
+                # Get line coverage for this file
+                lines = coverage_data.lines(filename)
+                missing = coverage_data.missing_lines(filename)
+
+                if lines:
+                    file_total = len(lines)
+                    file_covered = file_total - len(missing)
+
+                    total_lines += file_total
+                    covered_lines += file_covered
+
+                    file_coverage.append(
+                        {
+                            "file": filename,
+                            "lines_covered": file_covered,
+                            "lines_total": file_total,
+                            "coverage_percent": round(
+                                (file_covered / file_total) * 100, 2
+                            )
+                            if file_total > 0
+                            else 0,
+                            "missing_lines": list(missing),
+                        }
+                    )
+
+            coverage_percent = (
+                round((covered_lines / total_lines) * 100, 2)
+                if total_lines > 0
+                else 0.0
+            )
+
+            # Restart coverage for next test
+            self.coverage_collector.start()
+
+            return {
+                "lines_covered": covered_lines,
+                "lines_total": total_lines,
+                "coverage_percent": coverage_percent,
+                "files": file_coverage,
+                "status": "collected",
+            }
+
+        except Exception as e:
+            print(
+                f"DEBUG: Failed to collect coverage for test {test_id}: {e}", flush=True
+            )
+            return {
+                "lines_covered": 0,
+                "lines_total": 0,
+                "coverage_percent": 0.0,
+                "files": [],
+                "status": "error",
+                "error": str(e),
+            }
+
     def run_tests(self, test_labels=None, **kwargs):
         """Run tests with telemetry collection."""
         import signal
@@ -320,3 +496,9 @@ class TrimTelemetryRunner(DiscoverRunner):
         finally:
             # Restore network calls
             self.telemetry_collector.restore_network_calls(self.original_socket)
+            # Clean up coverage collection
+            if self.coverage_collector:
+                try:
+                    self.coverage_collector.stop()
+                except Exception as e:
+                    print(f"DEBUG: Error stopping coverage collector: {e}", flush=True)
