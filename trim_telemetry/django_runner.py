@@ -213,8 +213,8 @@ class TrimTelemetryRunner(DiscoverRunner):
                 with open(summary_file, "w") as f:
                     f.write(json.dumps(summary_data, indent=2))
                 print(f"DEBUG: TEST_SUMMARY written to {summary_file}", flush=True)
-            except Exception as e:
-                print(f"DEBUG: Failed to write TEST_SUMMARY to file: {e}", flush=True)
+            except Exception as file_error:
+                print(f"DEBUG: Failed to write TEST_SUMMARY to file: {file_error}", flush=True)
 
             return len(result.failures) + len(result.errors)
 
@@ -240,8 +240,8 @@ class TrimTelemetryRunner(DiscoverRunner):
                 with open(summary_file, "w") as f:
                     f.write(json.dumps(summary_data, indent=2))
                 print(f"DEBUG: TEST_SUMMARY written to {summary_file}", flush=True)
-            except Exception as e2:
-                print(f"DEBUG: Failed to write TEST_SUMMARY to file: {e2}", flush=True)
+            except Exception as file_error:
+                print(f"DEBUG: Failed to write TEST_SUMMARY to file: {file_error}", flush=True)
             raise
 
         finally:
