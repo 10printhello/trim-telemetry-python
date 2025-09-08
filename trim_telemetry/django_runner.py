@@ -120,24 +120,14 @@ class TrimTelemetryRunner(DiscoverRunner):
                             "blocked_calls": self.telemetry_collector.network_call_attempts.copy(),
                         },
                         "performance": {
-                            "is_slow": duration > 1000,  # > 1 second
-                            "is_db_heavy": queries > 50,
-                            "is_network_heavy": len(
+                            "duration_ms": round(duration),
+                            "database_queries_count": queries,
+                            "database_queries_duration_ms": round(query_time * 1000),
+                            "network_calls_attempted": len(
                                 self.telemetry_collector.network_call_attempts
-                            )
-                            > 0,
-                            "has_blocked_network_calls": len(
+                            ),
+                            "network_calls_blocked": len(
                                 self.telemetry_collector.network_call_attempts
-                            )
-                            > 0,
-                            "current_duration": round(duration),
-                            "avg_duration": self.runner._calculate_average_duration(),
-                            "median_duration": self.runner._calculate_percentile(50),
-                            "p95_duration": self.runner._calculate_percentile(95),
-                            "p99_duration": self.runner._calculate_percentile(99),
-                            "total_tests_run": len(self.runner.test_durations),
-                            "flags": self.runner._generate_performance_flags(
-                                duration, queries, test_queries
                             ),
                         },
                         "coverage": self.runner._collect_test_coverage(test_id),
@@ -239,77 +229,6 @@ class TrimTelemetryRunner(DiscoverRunner):
             ),
             "max_duration": round(max(query_durations) * 1000, 2),
         }
-
-    def _generate_performance_flags(self, duration, query_count, test_queries):
-        """Generate performance flags based on test metrics."""
-        flags = []
-
-        # Duration flags
-        if duration > 5000:
-            flags.append("very_slow")
-        elif duration > 1000:
-            flags.append("slow")
-
-        # Database query flags
-        if query_count > 100:
-            flags.append("high_db_queries")
-        elif query_count > 50:
-            flags.append("moderate_db_queries")
-
-        # Network call flags
-        if len(self.telemetry_collector.network_call_attempts) > 0:
-            flags.append("network_calls_blocked")
-
-        # Query-specific flags
-        if test_queries:
-            slow_query_count = len([q for q in test_queries if float(q["time"]) > 0.1])
-            if slow_query_count > 0:
-                flags.append(f"has_slow_queries_{slow_query_count}")
-
-            # Check for N+1 query patterns (multiple similar SELECT queries)
-            select_queries = [
-                q for q in test_queries if q["sql"].strip().upper().startswith("SELECT")
-            ]
-            if len(select_queries) > 10:
-                flags.append("potential_n_plus_1_queries")
-
-        return flags
-
-    def _calculate_percentile(self, percentile):
-        """Calculate percentile from test durations."""
-        if not self.test_durations:
-            return 0
-
-        # Sort durations
-        sorted_durations = sorted(self.test_durations)
-        n = len(sorted_durations)
-
-        if n == 1:
-            return round(sorted_durations[0])
-
-        # Calculate percentile index
-        index = (percentile / 100.0) * (n - 1)
-
-        if index.is_integer():
-            # Exact index
-            return round(sorted_durations[int(index)])
-        else:
-            # Interpolate between two values
-            lower_index = int(index)
-            upper_index = lower_index + 1
-            weight = index - lower_index
-
-            lower_value = sorted_durations[lower_index]
-            upper_value = sorted_durations[upper_index]
-
-            interpolated = lower_value + weight * (upper_value - lower_value)
-            return round(interpolated)
-
-    def _calculate_average_duration(self):
-        """Calculate average duration from test durations."""
-        if not self.test_durations:
-            return 0
-        return round(sum(self.test_durations) / len(self.test_durations))
 
     def _init_coverage_collector(self):
         """Initialize coverage collection if available."""
