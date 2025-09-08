@@ -205,6 +205,16 @@ class TrimTelemetryRunner(DiscoverRunner):
             }
             print(f"TEST_SUMMARY:{json.dumps(summary_data)}", flush=True)
             print("DEBUG: TEST_SUMMARY output completed", flush=True)
+            
+            # Also write to a local file as backup
+            try:
+                import os
+                summary_file = os.path.join(os.getcwd(), "test_summary.json")
+                with open(summary_file, "w") as f:
+                    f.write(json.dumps(summary_data, indent=2))
+                print(f"DEBUG: TEST_SUMMARY written to {summary_file}", flush=True)
+            except Exception as e:
+                print(f"DEBUG: Failed to write TEST_SUMMARY to file: {e}", flush=True)
 
             return len(result.failures) + len(result.errors)
 
@@ -222,6 +232,16 @@ class TrimTelemetryRunner(DiscoverRunner):
                 }
             print(f"TEST_SUMMARY:{json.dumps(summary_data)}", flush=True)
             print(f"DEBUG: Error occurred: {e}", flush=True)
+            
+            # Also write to a local file as backup
+            try:
+                import os
+                summary_file = os.path.join(os.getcwd(), "test_summary.json")
+                with open(summary_file, "w") as f:
+                    f.write(json.dumps(summary_data, indent=2))
+                print(f"DEBUG: TEST_SUMMARY written to {summary_file}", flush=True)
+            except Exception as e2:
+                print(f"DEBUG: Failed to write TEST_SUMMARY to file: {e2}", flush=True)
             raise
 
         finally:
