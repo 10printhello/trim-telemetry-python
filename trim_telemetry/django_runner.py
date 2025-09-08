@@ -122,7 +122,7 @@ class TrimTelemetryRunner(DiscoverRunner):
                         "file": test.__class__.__module__.replace(".", "/") + ".py",
                         "line": 0,  # Would need to extract from test method
                         "status": status,
-                        "duration": round(duration),
+                        "duration_ms": round(duration),
                         "start_time": datetime.fromtimestamp(start_time).isoformat(),
                         "end_time": datetime.fromtimestamp(end_time).isoformat(),
                         "tags": [],
@@ -172,7 +172,7 @@ class TrimTelemetryRunner(DiscoverRunner):
         if not test_queries:
             return {
                 "count": 0,
-                "total_duration": 0,
+                "total_duration_ms": 0,
                 "slow_queries": [],
                 "duplicate_queries": [],
                 "query_types": {
@@ -182,8 +182,8 @@ class TrimTelemetryRunner(DiscoverRunner):
                     "DELETE": 0,
                     "OTHER": 0,
                 },
-                "avg_duration": 0,
-                "max_duration": 0,
+                "avg_duration_ms": 0,
+                "max_duration_ms": 0,
             }
 
         # Analyze query types
@@ -215,7 +215,9 @@ class TrimTelemetryRunner(DiscoverRunner):
                     {
                         "sql": query["sql"],
                         "time": duration,
-                        "duration": round(duration * 1000),  # Convert to milliseconds
+                        "duration_ms": round(
+                            duration * 1000
+                        ),  # Convert to milliseconds
                     }
                 )
 
@@ -234,14 +236,16 @@ class TrimTelemetryRunner(DiscoverRunner):
 
         return {
             "count": len(test_queries),
-            "total_duration": round(total_query_time * 1000),  # Convert to milliseconds
+            "total_duration_ms": round(
+                total_query_time * 1000
+            ),  # Convert to milliseconds
             "slow_queries": slow_queries,
             "duplicate_queries": duplicate_queries,
             "query_types": query_types,
-            "avg_duration": round(
-                (sum(query_durations) / len(query_durations)) * 1000, 2
+            "avg_duration_ms": round(
+                (sum(query_durations) / len(query_durations)) * 1000
             ),
-            "max_duration": round(max(query_durations) * 1000, 2),
+            "max_duration_ms": round(max(query_durations) * 1000),
         }
 
     def _init_coverage_collector(self):
