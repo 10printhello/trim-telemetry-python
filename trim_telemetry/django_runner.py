@@ -39,7 +39,8 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.test_timings[test_id] = time.time()
 
         # Start capturing database queries for this test
-        self.test_queries[test_id] = CaptureQueriesContext(connection)
+        # Store the initial query count to calculate delta
+        self.test_queries[test_id] = len(connection.queries)
 
         # Add progress indicator for long-running tests
         if hasattr(self, "_test_count"):
@@ -78,8 +79,9 @@ class TelemetryTestResult(unittest.TextTestResult):
         start_time = self.test_timings.get(test_id, end_time)
         duration_ms = round((end_time - start_time) * 1000)
 
-        # Collect database telemetry
+        # Collect database telemetry and clean up
         database_telemetry = self._collect_database_telemetry(test_id)
+        self._cleanup_test_queries(test_id)
 
         test_telemetry = {
             "run_id": self.run_id,
@@ -119,31 +121,24 @@ class TelemetryTestResult(unittest.TextTestResult):
                 f"DEBUG: Progress - {self._completed_count} tests completed", flush=True
             )
 
+    def _cleanup_test_queries(self, test_id):
+        """Clean up query data for a test."""
+        try:
+            if test_id in self.test_queries:
+                del self.test_queries[test_id]
+        except Exception as e:
+            print(f"DEBUG: Error cleaning up queries for {test_id}: {e}", flush=True)
+
     def _collect_database_telemetry(self, test_id):
         """Collect database telemetry for a test."""
         try:
-            # Get the captured queries for this test
-            query_context = self.test_queries.get(test_id)
-            if not query_context:
-                return {
-                    "count": 0,
-                    "total_duration_ms": 0,
-                    "slow_queries": [],
-                    "duplicate_queries": [],
-                    "query_types": {
-                        "SELECT": 0,
-                        "INSERT": 0,
-                        "UPDATE": 0,
-                        "DELETE": 0,
-                        "OTHER": 0,
-                    },
-                    "avg_duration_ms": 0,
-                    "max_duration_ms": 0,
-                }
-
-            # Get the captured queries
-            queries = query_context.captured_queries
-            query_count = len(queries)
+            # Get the initial query count for this test
+            initial_count = self.test_queries.get(test_id, 0)
+            current_queries = connection.queries
+            
+            # Get queries that were executed during this test
+            test_queries = current_queries[initial_count:]
+            query_count = len(test_queries)
 
             if query_count == 0:
                 return {
@@ -175,7 +170,7 @@ class TelemetryTestResult(unittest.TextTestResult):
             query_signatures = {}
             max_duration = 0
 
-            for query in queries:
+            for query in test_queries:
                 duration = query.get("time", 0)
                 total_duration += duration
                 max_duration = max(max_duration, duration)
