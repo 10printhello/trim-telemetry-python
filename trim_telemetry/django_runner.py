@@ -41,7 +41,7 @@ class TelemetryTestResult(unittest.TextTestResult):
         try:
             # Reset any existing queries
             reset_queries()
-            
+
             # Enable query logging in settings (Django best practice)
             if not getattr(settings, "DEBUG", False):
                 settings.DEBUG = True
@@ -60,9 +60,8 @@ class TelemetryTestResult(unittest.TextTestResult):
         # Reset queries before each test (Django best practice)
         reset_queries()
         
-        # Start capturing database queries for this test using CaptureQueriesContext
-        self.test_queries[test_id] = CaptureQueriesContext(connection)
-        self.test_queries[test_id].__enter__()
+        # Store initial query count for this test (simpler approach)
+        self.test_queries[test_id] = len(connection.queries)
 
         # Add progress indicator for long-running tests
         if hasattr(self, "_test_count"):
@@ -144,11 +143,9 @@ class TelemetryTestResult(unittest.TextTestResult):
             )
 
     def _cleanup_test_queries(self, test_id):
-        """Clean up query context for a test."""
+        """Clean up query data for a test."""
         try:
-            query_context = self.test_queries.get(test_id)
-            if query_context:
-                query_context.__exit__(None, None, None)  # Exit the context manager
+            if test_id in self.test_queries:
                 del self.test_queries[test_id]
         except Exception as e:
             print(f"DEBUG: Error cleaning up queries for {test_id}: {e}", flush=True)
@@ -156,29 +153,14 @@ class TelemetryTestResult(unittest.TextTestResult):
     def _collect_database_telemetry(self, test_id):
         """Collect database telemetry for a test."""
         try:
-            # Get the CaptureQueriesContext for this test
-            query_context = self.test_queries.get(test_id)
-            if not query_context:
-                return {
-                    "count": 0,
-                    "total_duration_ms": 0,
-                    "slow_queries": [],
-                    "duplicate_queries": [],
-                    "query_types": {
-                        "SELECT": 0,
-                        "INSERT": 0,
-                        "UPDATE": 0,
-                        "DELETE": 0,
-                        "OTHER": 0,
-                    },
-                    "avg_duration_ms": 0,
-                    "max_duration_ms": 0,
-                }
-
-            # Get the captured queries from the context
-            test_queries = query_context.captured_queries
+            # Get the initial query count for this test
+            initial_count = self.test_queries.get(test_id, 0)
+            current_queries = connection.queries
+            
+            # Get queries that were executed during this test
+            test_queries = current_queries[initial_count:]
             query_count = len(test_queries)
-
+            
             # Debug: Show query count for this test
             if query_count > 0:
                 print(f"DEBUG: Test {test_id} had {query_count} queries", flush=True)
