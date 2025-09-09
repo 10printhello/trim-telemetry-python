@@ -37,13 +37,13 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.test_timings = {}
         self.test_queries = {}  # Store queries for each test
         self.test_network_calls = {}  # Store network calls for each test
-        
+
         # Thread-local storage for network monitoring
         self._thread_local = threading.local()
 
         # Enable query logging if not already enabled
         self._ensure_query_logging_enabled()
-        
+
         # Set up network monitoring once (thread-safe)
         self._setup_network_monitoring()
 
@@ -62,24 +62,6 @@ class TelemetryTestResult(unittest.TextTestResult):
         except Exception as e:
             print(f"DEBUG: Error enabling query logging: {e}", flush=True)
 
-    def _is_internal_call(self, url):
-        """Check if a URL is internal/localhost to avoid interfering with database operations."""
-        internal_patterns = [
-            'localhost',
-            '127.0.0.1',
-            '0.0.0.0',
-            '::1',
-            'database',
-            'postgres',
-            'mysql',
-            'redis',
-            'memcached',
-            'rabbitmq',
-            'elasticsearch',
-        ]
-        
-        url_lower = url.lower()
-        return any(pattern in url_lower for pattern in internal_patterns)
 
     def _start_network_monitoring(self, test_id):
         """Start monitoring network calls for a test."""
@@ -91,7 +73,7 @@ class TelemetryTestResult(unittest.TextTestResult):
                 "original_request": getattr(urllib.request, "Request", None),
             }
 
-            # Create a tracked version that only logs calls from this specific test
+            # Create a simple tracked version that just logs URLs
             def tracked_urlopen(*args, **kwargs):
                 # Only track if this is called during our test's execution
                 if test_id not in self.test_network_calls:
@@ -100,49 +82,21 @@ class TelemetryTestResult(unittest.TextTestResult):
                         "original_urlopen", urllib.request.urlopen
                     )(*args, **kwargs)
 
-                start_time = time.time()
+                # Just capture the URL - no timing, no blocking
                 url = args[0] if args else kwargs.get("url", "unknown")
-                method = "GET"  # Default for urlopen
                 url_str = str(url)
 
-                # Filter out internal/localhost calls to avoid database interference
-                if self._is_internal_call(url_str):
-                    # Internal call, use original without tracking
-                    return self.test_network_calls[test_id]["original_urlopen"](*args, **kwargs)
+                # Make the actual call using the original function (no timing)
+                result = self.test_network_calls[test_id]["original_urlopen"](
+                    *args, **kwargs
+                )
 
-                try:
-                    # Make the actual call using the original function
-                    result = self.test_network_calls[test_id]["original_urlopen"](
-                        *args, **kwargs
-                    )
-                    duration_ms = round((time.time() - start_time) * 1000)
+                # Log the call (just URL, no duration or status)
+                self.test_network_calls[test_id]["calls"].append({
+                    "url": url_str,
+                })
 
-                    # Log the external call
-                    self.test_network_calls[test_id]["calls"].append(
-                        {
-                            "url": url_str,
-                            "method": method,
-                            "duration_ms": duration_ms,
-                            "status": "success",
-                        }
-                    )
-
-                    return result
-                except Exception as e:
-                    duration_ms = round((time.time() - start_time) * 1000)
-
-                    # Log the failed call
-                    self.test_network_calls[test_id]["calls"].append(
-                        {
-                            "url": str(url),
-                            "method": method,
-                            "duration_ms": duration_ms,
-                            "status": "error",
-                            "error": str(e),
-                        }
-                    )
-
-                    raise
+                return result
 
             # Apply the patch
             urllib.request.urlopen = tracked_urlopen
@@ -429,26 +383,14 @@ class TelemetryTestResult(unittest.TextTestResult):
 
             if not calls:
                 return {
-                    "calls_attempted": 0,
-                    "calls_blocked": 0,
-                    "total_duration_ms": 0,
-                    "external_calls": [],
-                    "blocked_calls": [],
+                    "total_calls": 0,
+                    "urls": [],
                 }
 
-            # Analyze network calls
-            total_duration = sum(call.get("duration_ms", 0) for call in calls)
-            successful_calls = [
-                call for call in calls if call.get("status") == "success"
-            ]
-            failed_calls = [call for call in calls if call.get("status") == "error"]
-
+            # Just return the URLs - no complex metrics
             return {
-                "calls_attempted": len(calls),
-                "calls_blocked": 0,  # We don't block, just log
-                "total_duration_ms": total_duration,
-                "external_calls": successful_calls,
-                "blocked_calls": failed_calls,  # Failed calls go here
+                "total_calls": len(calls),
+                "urls": [call.get("url", "unknown") for call in calls],
             }
 
         except Exception as e:
@@ -457,11 +399,8 @@ class TelemetryTestResult(unittest.TextTestResult):
                 flush=True,
             )
             return {
-                "calls_attempted": 0,
-                "calls_blocked": 0,
-                "total_duration_ms": 0,
-                "external_calls": [],
-                "blocked_calls": [],
+                "total_calls": 0,
+                "urls": [],
             }
 
 
