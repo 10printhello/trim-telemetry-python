@@ -9,7 +9,8 @@ import unittest
 from datetime import datetime
 from django.test.runner import DiscoverRunner
 from django.test.utils import CaptureQueriesContext
-from django.db import connection
+from django.db import connection, reset_queries
+from django.conf import settings
 
 
 class TelemetryTestResult(unittest.TextTestResult):
@@ -32,15 +33,36 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.test_timings = {}
         self.test_queries = {}  # Store queries for each test
 
+        # Enable query logging if not already enabled
+        self._ensure_query_logging_enabled()
+
+    def _ensure_query_logging_enabled(self):
+        """Ensure Django query logging is enabled."""
+        try:
+            # Reset any existing queries
+            reset_queries()
+            
+            # Enable query logging in settings (Django best practice)
+            if not getattr(settings, "DEBUG", False):
+                settings.DEBUG = True
+                print("DEBUG: Enabled DEBUG mode for query logging", flush=True)
+
+            print("DEBUG: Query logging enabled", flush=True)
+        except Exception as e:
+            print(f"DEBUG: Error enabling query logging: {e}", flush=True)
+
     def startTest(self, test):
         super().startTest(test)
         test_id = str(test)
         self.test_status[test_id] = "running"
         self.test_timings[test_id] = time.time()
 
-        # Start capturing database queries for this test
-        # Store the initial query count to calculate delta
-        self.test_queries[test_id] = len(connection.queries)
+        # Reset queries before each test (Django best practice)
+        reset_queries()
+        
+        # Start capturing database queries for this test using CaptureQueriesContext
+        self.test_queries[test_id] = CaptureQueriesContext(connection)
+        self.test_queries[test_id].__enter__()
 
         # Add progress indicator for long-running tests
         if hasattr(self, "_test_count"):
@@ -122,9 +144,11 @@ class TelemetryTestResult(unittest.TextTestResult):
             )
 
     def _cleanup_test_queries(self, test_id):
-        """Clean up query data for a test."""
+        """Clean up query context for a test."""
         try:
-            if test_id in self.test_queries:
+            query_context = self.test_queries.get(test_id)
+            if query_context:
+                query_context.__exit__(None, None, None)  # Exit the context manager
                 del self.test_queries[test_id]
         except Exception as e:
             print(f"DEBUG: Error cleaning up queries for {test_id}: {e}", flush=True)
@@ -132,13 +156,32 @@ class TelemetryTestResult(unittest.TextTestResult):
     def _collect_database_telemetry(self, test_id):
         """Collect database telemetry for a test."""
         try:
-            # Get the initial query count for this test
-            initial_count = self.test_queries.get(test_id, 0)
-            current_queries = connection.queries
+            # Get the CaptureQueriesContext for this test
+            query_context = self.test_queries.get(test_id)
+            if not query_context:
+                return {
+                    "count": 0,
+                    "total_duration_ms": 0,
+                    "slow_queries": [],
+                    "duplicate_queries": [],
+                    "query_types": {
+                        "SELECT": 0,
+                        "INSERT": 0,
+                        "UPDATE": 0,
+                        "DELETE": 0,
+                        "OTHER": 0,
+                    },
+                    "avg_duration_ms": 0,
+                    "max_duration_ms": 0,
+                }
 
-            # Get queries that were executed during this test
-            test_queries = current_queries[initial_count:]
+            # Get the captured queries from the context
+            test_queries = query_context.captured_queries
             query_count = len(test_queries)
+
+            # Debug: Show query count for this test
+            if query_count > 0:
+                print(f"DEBUG: Test {test_id} had {query_count} queries", flush=True)
 
             if query_count == 0:
                 return {
