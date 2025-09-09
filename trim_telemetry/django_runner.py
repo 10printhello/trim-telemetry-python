@@ -59,7 +59,7 @@ class TelemetryTestResult(unittest.TextTestResult):
 
         # Reset queries before each test (Django best practice)
         reset_queries()
-        
+
         # Store initial query count for this test (simpler approach)
         self.test_queries[test_id] = len(connection.queries)
 
@@ -150,37 +150,54 @@ class TelemetryTestResult(unittest.TextTestResult):
         except Exception as e:
             print(f"DEBUG: Error cleaning up queries for {test_id}: {e}", flush=True)
 
+    def _get_empty_database_telemetry(self):
+        """Return empty database telemetry structure."""
+        return {
+            "count": 0,
+            "total_duration_ms": 0,
+            "slow_queries": [],
+            "duplicate_queries": [],
+            "query_types": {
+                "SELECT": 0,
+                "INSERT": 0,
+                "UPDATE": 0,
+                "DELETE": 0,
+                "OTHER": 0,
+            },
+            "avg_duration_ms": 0,
+            "max_duration_ms": 0,
+        }
+
     def _collect_database_telemetry(self, test_id):
         """Collect database telemetry for a test."""
         try:
             # Get the initial query count for this test
             initial_count = self.test_queries.get(test_id, 0)
+
+            # Check if connection.queries is available
+            if not hasattr(connection, "queries"):
+                print(
+                    f"DEBUG: connection.queries not available for {test_id}", flush=True
+                )
+                return self._get_empty_database_telemetry()
+
             current_queries = connection.queries
-            
+
             # Get queries that were executed during this test
             test_queries = current_queries[initial_count:]
             query_count = len(test_queries)
-            
+
             # Debug: Show query count for this test
             if query_count > 0:
                 print(f"DEBUG: Test {test_id} had {query_count} queries", flush=True)
+            elif initial_count == 0 and len(current_queries) > 0:
+                print(
+                    f"DEBUG: Test {test_id} - total queries in connection: {len(current_queries)}",
+                    flush=True,
+                )
 
             if query_count == 0:
-                return {
-                    "count": 0,
-                    "total_duration_ms": 0,
-                    "slow_queries": [],
-                    "duplicate_queries": [],
-                    "query_types": {
-                        "SELECT": 0,
-                        "INSERT": 0,
-                        "UPDATE": 0,
-                        "DELETE": 0,
-                        "OTHER": 0,
-                    },
-                    "avg_duration_ms": 0,
-                    "max_duration_ms": 0,
-                }
+                return self._get_empty_database_telemetry()
 
             # Analyze queries
             total_duration = 0
@@ -263,21 +280,7 @@ class TelemetryTestResult(unittest.TextTestResult):
                 f"DEBUG: Error collecting database telemetry for {test_id}: {e}",
                 flush=True,
             )
-            return {
-                "count": 0,
-                "total_duration_ms": 0,
-                "slow_queries": [],
-                "duplicate_queries": [],
-                "query_types": {
-                    "SELECT": 0,
-                    "INSERT": 0,
-                    "UPDATE": 0,
-                    "DELETE": 0,
-                    "OTHER": 0,
-                },
-                "avg_duration_ms": 0,
-                "max_duration_ms": 0,
-            }
+            return self._get_empty_database_telemetry()
 
 
 class TrimTelemetryRunner(DiscoverRunner):
