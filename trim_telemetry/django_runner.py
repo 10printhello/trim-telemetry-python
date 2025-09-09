@@ -44,9 +44,6 @@ class TelemetryTestResult(unittest.TextTestResult):
         # Enable query logging if not already enabled
         self._ensure_query_logging_enabled()
 
-        # Set up network monitoring once (thread-safe)
-        self._setup_network_monitoring()
-
     def _ensure_query_logging_enabled(self):
         """Ensure Django query logging is enabled."""
         try:
