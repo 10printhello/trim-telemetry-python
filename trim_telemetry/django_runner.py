@@ -190,6 +190,11 @@ class TelemetryTestResult(unittest.TextTestResult):
             # Debug: Show query count for this test
             if query_count > 0:
                 print(f"DEBUG: Test {test_id} had {query_count} queries", flush=True)
+                # Debug: Show first query structure
+                if test_queries:
+                    first_query = test_queries[0]
+                    print(f"DEBUG: First query keys: {list(first_query.keys())}", flush=True)
+                    print(f"DEBUG: First query time type: {type(first_query.get('time', 'N/A'))}", flush=True)
             elif initial_count == 0 and len(current_queries) > 0:
                 print(
                     f"DEBUG: Test {test_id} - total queries in connection: {len(current_queries)}",
@@ -213,7 +218,13 @@ class TelemetryTestResult(unittest.TextTestResult):
             max_duration = 0
 
             for query in test_queries:
-                duration = query.get("time", 0)
+                # Handle both string and numeric duration values
+                duration_raw = query.get("time", 0)
+                try:
+                    duration = float(duration_raw) if duration_raw else 0
+                except (ValueError, TypeError):
+                    duration = 0
+                
                 total_duration += duration
                 max_duration = max(max_duration, duration)
 
