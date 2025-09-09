@@ -138,7 +138,8 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.test_network_calls[test_id] = []
 
         # Start network call monitoring for this test
-        self._start_network_monitoring(test_id)
+        # Temporarily disabled to test if even simplified monitoring causes database locking
+        # self._start_network_monitoring(test_id)
 
         # Add progress indicator for long-running tests
         if hasattr(self, "_test_count"):
@@ -183,7 +184,7 @@ class TelemetryTestResult(unittest.TextTestResult):
 
         # Collect network telemetry and clean up
         network_telemetry = self._collect_network_telemetry(test_id)
-        self._stop_network_monitoring(test_id)
+        # self._stop_network_monitoring(test_id)
 
         test_telemetry = {
             "run_id": self.run_id,
