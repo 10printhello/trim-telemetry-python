@@ -6,6 +6,7 @@ import json
 import sys
 import time
 import unittest
+import threading
 from datetime import datetime
 from django.test.runner import DiscoverRunner
 from django.test.utils import CaptureQueriesContext
@@ -36,9 +37,15 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.test_timings = {}
         self.test_queries = {}  # Store queries for each test
         self.test_network_calls = {}  # Store network calls for each test
+        
+        # Thread-local storage for network monitoring
+        self._thread_local = threading.local()
 
         # Enable query logging if not already enabled
         self._ensure_query_logging_enabled()
+        
+        # Set up network monitoring once (thread-safe)
+        self._setup_network_monitoring()
 
     def _ensure_query_logging_enabled(self):
         """Ensure Django query logging is enabled."""
@@ -54,6 +61,25 @@ class TelemetryTestResult(unittest.TextTestResult):
             print("DEBUG: Query logging enabled", flush=True)
         except Exception as e:
             print(f"DEBUG: Error enabling query logging: {e}", flush=True)
+
+    def _is_internal_call(self, url):
+        """Check if a URL is internal/localhost to avoid interfering with database operations."""
+        internal_patterns = [
+            'localhost',
+            '127.0.0.1',
+            '0.0.0.0',
+            '::1',
+            'database',
+            'postgres',
+            'mysql',
+            'redis',
+            'memcached',
+            'rabbitmq',
+            'elasticsearch',
+        ]
+        
+        url_lower = url.lower()
+        return any(pattern in url_lower for pattern in internal_patterns)
 
     def _start_network_monitoring(self, test_id):
         """Start monitoring network calls for a test."""
@@ -77,6 +103,12 @@ class TelemetryTestResult(unittest.TextTestResult):
                 start_time = time.time()
                 url = args[0] if args else kwargs.get("url", "unknown")
                 method = "GET"  # Default for urlopen
+                url_str = str(url)
+
+                # Filter out internal/localhost calls to avoid database interference
+                if self._is_internal_call(url_str):
+                    # Internal call, use original without tracking
+                    return self.test_network_calls[test_id]["original_urlopen"](*args, **kwargs)
 
                 try:
                     # Make the actual call using the original function
@@ -85,10 +117,10 @@ class TelemetryTestResult(unittest.TextTestResult):
                     )
                     duration_ms = round((time.time() - start_time) * 1000)
 
-                    # Log the successful call
+                    # Log the external call
                     self.test_network_calls[test_id]["calls"].append(
                         {
-                            "url": str(url),
+                            "url": url_str,
                             "method": method,
                             "duration_ms": duration_ms,
                             "status": "success",
@@ -154,8 +186,7 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.test_network_calls[test_id] = []
 
         # Start network call monitoring for this test
-        # Temporarily disabled to test if this causes database locking
-        # self._start_network_monitoring(test_id)
+        self._start_network_monitoring(test_id)
 
         # Add progress indicator for long-running tests
         if hasattr(self, "_test_count"):
@@ -200,7 +231,7 @@ class TelemetryTestResult(unittest.TextTestResult):
 
         # Collect network telemetry and clean up
         network_telemetry = self._collect_network_telemetry(test_id)
-        # self._stop_network_monitoring(test_id)
+        self._stop_network_monitoring(test_id)
 
         test_telemetry = {
             "run_id": self.run_id,
