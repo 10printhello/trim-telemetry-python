@@ -70,8 +70,10 @@ class TelemetryTestResult(unittest.TextTestResult):
                 # Only track if this is called during our test's execution
                 if test_id not in self.test_network_calls:
                     # Fall back to original if test is no longer active
-                    return self.test_network_calls.get(test_id, {}).get("original_urlopen", urllib.request.urlopen)(*args, **kwargs)
-                
+                    return self.test_network_calls.get(test_id, {}).get(
+                        "original_urlopen", urllib.request.urlopen
+                    )(*args, **kwargs)
+
                 start_time = time.time()
                 url = args[0] if args else kwargs.get("url", "unknown")
                 method = "GET"  # Default for urlopen
