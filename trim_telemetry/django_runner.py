@@ -31,8 +31,19 @@ class TelemetryTestResult(unittest.TextTestResult):
 
     def startTest(self, test):
         super().startTest(test)
-        self.test_status[str(test)] = "running"
-        self.test_timings[str(test)] = time.time()
+        test_id = str(test)
+        self.test_status[test_id] = "running"
+        self.test_timings[test_id] = time.time()
+
+        # Add progress indicator for long-running tests
+        if hasattr(self, "_test_count"):
+            self._test_count += 1
+        else:
+            self._test_count = 1
+
+        # Print progress every 50 tests
+        if self._test_count % 50 == 0:
+            print(f"DEBUG: Progress - {self._test_count} tests started", flush=True)
 
     def addSuccess(self, test):
         super().addSuccess(test)
@@ -100,6 +111,18 @@ class TelemetryTestResult(unittest.TextTestResult):
             },
         }
         print(f"TEST_RESULT:{json.dumps(test_telemetry)}", flush=True)
+
+        # Add completion progress indicator
+        if hasattr(self, "_completed_count"):
+            self._completed_count += 1
+        else:
+            self._completed_count = 1
+
+        # Print completion progress every 100 tests
+        if self._completed_count % 100 == 0:
+            print(
+                f"DEBUG: Progress - {self._completed_count} tests completed", flush=True
+            )
 
 
 class TrimTelemetryRunner(DiscoverRunner):
