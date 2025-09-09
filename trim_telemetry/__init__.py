@@ -5,12 +5,15 @@ Trim Telemetry - Rich test telemetry collection package
 __version__ = "0.1.0"
 __author__ = "Trim Team"
 
-from .django_instrumentation import DjangoInstrumentation
-from .pytest_instrumentation import PytestInstrumentation
-from .unittest_instrumentation import UnittestInstrumentation
+# New runners (recommended) - import on demand to avoid Django dependencies
+# from .django_runner import TrimTelemetryRunner
+# from .pytest_runner import main as pytest_main
+# from .unittest_runner import TrimUnittestRunner, main as unittest_main
 
-__all__ = [
-    "DjangoInstrumentation",
-    "PytestInstrumentation",
-    "UnittestInstrumentation",
-]
+# Note: Legacy instrumentation files have been removed
+# Use the new runners instead:
+# - trim_telemetry.django_runner.TrimTelemetryRunner
+# - trim_telemetry.pytest_runner.main
+# - trim_telemetry.unittest_runner.main
+
+__all__ = []
