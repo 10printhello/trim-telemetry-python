@@ -9,12 +9,9 @@ import unittest
 import threading
 from datetime import datetime
 from django.test.runner import DiscoverRunner
-from django.test.utils import CaptureQueriesContext
 from django.db import connection, reset_queries
 from django.conf import settings
 import urllib.request
-import urllib.error
-import urllib.parse
 
 
 class TelemetryTestResult(unittest.TextTestResult):
@@ -53,11 +50,9 @@ class TelemetryTestResult(unittest.TextTestResult):
             # Enable query logging in settings (Django best practice)
             if not getattr(settings, "DEBUG", False):
                 settings.DEBUG = True
-                print("DEBUG: Enabled DEBUG mode for query logging", flush=True)
-
-            print("DEBUG: Query logging enabled", flush=True)
-        except Exception as e:
-            print(f"DEBUG: Error enabling query logging: {e}", flush=True)
+        except Exception:
+            # Silently handle errors - telemetry should not break tests
+            pass
 
     def _start_network_monitoring(self, test_id):
         """Start monitoring network calls for a test."""
@@ -99,11 +94,9 @@ class TelemetryTestResult(unittest.TextTestResult):
             # Apply the patch
             urllib.request.urlopen = tracked_urlopen
 
-        except Exception as e:
-            print(
-                f"DEBUG: Error starting network monitoring for {test_id}: {e}",
-                flush=True,
-            )
+        except Exception:
+            # Silently handle errors - telemetry should not break tests
+            pass
 
     def _stop_network_monitoring(self, test_id):
         """Stop monitoring network calls for a test."""
@@ -116,11 +109,9 @@ class TelemetryTestResult(unittest.TextTestResult):
 
                 # Clean up
                 del self.test_network_calls[test_id]
-        except Exception as e:
-            print(
-                f"DEBUG: Error stopping network monitoring for {test_id}: {e}",
-                flush=True,
-            )
+        except Exception:
+            # Silently handle errors - telemetry should not break tests
+            pass
 
     def startTest(self, test):
         super().startTest(test)
@@ -140,15 +131,11 @@ class TelemetryTestResult(unittest.TextTestResult):
         # Start network call monitoring for this test
         self._start_network_monitoring(test_id)
 
-        # Add progress indicator for long-running tests
+        # Track test count for internal use
         if hasattr(self, "_test_count"):
             self._test_count += 1
         else:
             self._test_count = 1
-
-        # Print progress every 50 tests
-        if self._test_count % 50 == 0:
-            print(f"DEBUG: Progress - {self._test_count} tests started", flush=True)
 
     def addSuccess(self, test):
         super().addSuccess(test)
@@ -205,25 +192,20 @@ class TelemetryTestResult(unittest.TextTestResult):
         }
         print(f"TEST_RESULT:{json.dumps(test_telemetry)}", flush=True)
 
-        # Add completion progress indicator
+        # Track completion count for internal use
         if hasattr(self, "_completed_count"):
             self._completed_count += 1
         else:
             self._completed_count = 1
-
-        # Print completion progress every 100 tests
-        if self._completed_count % 100 == 0:
-            print(
-                f"DEBUG: Progress - {self._completed_count} tests completed", flush=True
-            )
 
     def _cleanup_test_queries(self, test_id):
         """Clean up query data for a test."""
         try:
             if test_id in self.test_queries:
                 del self.test_queries[test_id]
-        except Exception as e:
-            print(f"DEBUG: Error cleaning up queries for {test_id}: {e}", flush=True)
+        except Exception:
+            # Silently handle errors - telemetry should not break tests
+            pass
 
     def _get_empty_database_telemetry(self):
         """Return empty database telemetry structure."""
@@ -251,9 +233,6 @@ class TelemetryTestResult(unittest.TextTestResult):
 
             # Check if connection.queries is available
             if not hasattr(connection, "queries"):
-                print(
-                    f"DEBUG: connection.queries not available for {test_id}", flush=True
-                )
                 return self._get_empty_database_telemetry()
 
             current_queries = connection.queries
@@ -261,26 +240,6 @@ class TelemetryTestResult(unittest.TextTestResult):
             # Get queries that were executed during this test
             test_queries = current_queries[initial_count:]
             query_count = len(test_queries)
-
-            # Debug: Show query count for this test
-            if query_count > 0:
-                print(f"DEBUG: Test {test_id} had {query_count} queries", flush=True)
-                # Debug: Show first query structure
-                if test_queries:
-                    first_query = test_queries[0]
-                    print(
-                        f"DEBUG: First query keys: {list(first_query.keys())}",
-                        flush=True,
-                    )
-                    print(
-                        f"DEBUG: First query time type: {type(first_query.get('time', 'N/A'))}",
-                        flush=True,
-                    )
-            elif initial_count == 0 and len(current_queries) > 0:
-                print(
-                    f"DEBUG: Test {test_id} - total queries in connection: {len(current_queries)}",
-                    flush=True,
-                )
 
             if query_count == 0:
                 return self._get_empty_database_telemetry()
@@ -365,12 +324,8 @@ class TelemetryTestResult(unittest.TextTestResult):
                 "max_duration_ms": round(max_duration * 1000),
             }
 
-        except Exception as e:
+        except Exception:
             # If there's any error collecting database telemetry, return zeros
-            print(
-                f"DEBUG: Error collecting database telemetry for {test_id}: {e}",
-                flush=True,
-            )
             return self._get_empty_database_telemetry()
 
     def _collect_network_telemetry(self, test_id):
@@ -391,11 +346,8 @@ class TelemetryTestResult(unittest.TextTestResult):
                 "urls": [call.get("url", "unknown") for call in calls],
             }
 
-        except Exception as e:
-            print(
-                f"DEBUG: Error collecting network telemetry for {test_id}: {e}",
-                flush=True,
-            )
+        except Exception:
+            # If there's any error collecting network telemetry, return zeros
             return {
                 "total_calls": 0,
                 "urls": [],
@@ -408,15 +360,9 @@ class TrimTelemetryRunner(DiscoverRunner):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        print(
-            f"DEBUG: TrimTelemetryRunner initialized with run_id: {self.run_id}",
-            flush=True,
-        )
 
     def run_suite(self, suite, **kwargs):
         """Run test suite with per-test telemetry."""
-        print(f"DEBUG: Running suite with {suite.countTestCases()} tests", flush=True)
-
         # Use our custom result class
         result = TelemetryTestResult(
             self.run_id,
@@ -428,16 +374,10 @@ class TrimTelemetryRunner(DiscoverRunner):
         # Run the suite
         suite.run(result)
 
-        # Output basic telemetry for each test
-        if hasattr(result, "testsRun"):
-            print(f"DEBUG: Tests completed: {result.testsRun}", flush=True)
-
         return result
 
     def run_tests(self, test_labels=None, **kwargs):
         """Run tests with minimal telemetry."""
-        print(f"DEBUG: run_tests called with test_labels: {test_labels}", flush=True)
-
         # Use standard Django behavior
         result = super().run_tests(test_labels, **kwargs)
 
