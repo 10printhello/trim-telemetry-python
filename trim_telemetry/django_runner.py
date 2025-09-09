@@ -135,7 +135,7 @@ class TelemetryTestResult(unittest.TextTestResult):
             # Get the initial query count for this test
             initial_count = self.test_queries.get(test_id, 0)
             current_queries = connection.queries
-            
+
             # Get queries that were executed during this test
             test_queries = current_queries[initial_count:]
             query_count = len(test_queries)
