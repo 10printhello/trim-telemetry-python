@@ -62,7 +62,6 @@ class TelemetryTestResult(unittest.TextTestResult):
         except Exception as e:
             print(f"DEBUG: Error enabling query logging: {e}", flush=True)
 
-
     def _start_network_monitoring(self, test_id):
         """Start monitoring network calls for a test."""
         try:
@@ -92,9 +91,11 @@ class TelemetryTestResult(unittest.TextTestResult):
                 )
 
                 # Log the call (just URL, no duration or status)
-                self.test_network_calls[test_id]["calls"].append({
-                    "url": url_str,
-                })
+                self.test_network_calls[test_id]["calls"].append(
+                    {
+                        "url": url_str,
+                    }
+                )
 
                 return result
 
