@@ -3,6 +3,7 @@ Django test runner with minimal telemetry
 """
 
 import json
+import sys
 import time
 import unittest
 from datetime import datetime
@@ -18,6 +19,10 @@ class TelemetryTestResult(unittest.TextTestResult):
         if verbosity is None:
             verbosity = 1
         kwargs["verbosity"] = verbosity
+
+        # Ensure stream is not None, default to sys.stdout
+        if kwargs.get("stream") is None:
+            kwargs["stream"] = sys.stdout
 
         super().__init__(*args, **kwargs)
         self.run_id = run_id
