@@ -304,7 +304,7 @@ class TrimTelemetryRunner(DiscoverRunner):
             failed_tests = len(result.failures) + len(result.errors)
             skipped_tests = len(result.skipped) if hasattr(result, "skipped") else 0
             passed_tests = total_tests - failed_tests - skipped_tests
-            
+
             # Debug: Print detailed test counts
             print(f"DEBUG: Test count breakdown:", flush=True)
             print(f"  - total_tests: {total_tests}", flush=True)
