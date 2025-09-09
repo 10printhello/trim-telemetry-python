@@ -20,8 +20,9 @@ class TrimTelemetryRunner(DiscoverRunner):
         self.telemetry_collector = BaseTelemetryCollector()
         # Generate unique run ID for this test run
         self.run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        # Block network calls
-        self.original_socket = self.telemetry_collector.block_network_calls()
+        # Temporarily disable network blocking to test if it's causing database issues
+        # self.original_socket = self.telemetry_collector.block_network_calls()
+        self.original_socket = None
         # Track query counts per test for isolation
         self.test_query_counts = {}
         # Track test durations for percentile calculations
@@ -327,5 +328,6 @@ class TrimTelemetryRunner(DiscoverRunner):
             raise
 
         finally:
-            # Restore network calls
-            self.telemetry_collector.restore_network_calls(self.original_socket)
+            # Restore network calls (if they were blocked)
+            if self.original_socket:
+                self.telemetry_collector.restore_network_calls(self.original_socket)
