@@ -111,7 +111,6 @@ class TrimTelemetryRunner(DiscoverRunner):
 
                     # Create rich telemetry data
                     test_telemetry = {
-                        "run_id": self.runner.run_id,
                         "id": test_id,
                         "name": getattr(test, "_testMethodName", test_id),
                         "class": test.__class__.__name__,
@@ -310,11 +309,11 @@ class TrimTelemetryRunner(DiscoverRunner):
             print(f"  - total_tests: {total_tests}", flush=True)
             print(f"  - failures: {len(result.failures)}", flush=True)
             print(f"  - errors: {len(result.errors)}", flush=True)
+            print(f"  - total_failed: {failed_tests}", flush=True)
             print(f"  - skipped: {skipped_tests}", flush=True)
             print(f"  - calculated passed: {passed_tests}", flush=True)
 
             summary_data = {
-                "run_id": self.run_id,
                 "type": "test_run_summary",
                 "total_tests": total_tests,
                 "passed_tests": passed_tests,
