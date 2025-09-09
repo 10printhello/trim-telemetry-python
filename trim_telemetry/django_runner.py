@@ -63,7 +63,7 @@ class TrimTelemetryRunner(DiscoverRunner):
                 end_time = time.time()
                 start_time = self.test_timings.get(test_id, end_time)
                 duration_ms = round((end_time - start_time) * 1000)
-                
+
                 test_telemetry = {
                     "run_id": self.run_id,
                     "id": test_id,
@@ -81,7 +81,13 @@ class TrimTelemetryRunner(DiscoverRunner):
                         "total_duration_ms": 0,
                         "slow_queries": [],
                         "duplicate_queries": [],
-                        "query_types": {"SELECT": 0, "INSERT": 0, "UPDATE": 0, "DELETE": 0, "OTHER": 0},
+                        "query_types": {
+                            "SELECT": 0,
+                            "INSERT": 0,
+                            "UPDATE": 0,
+                            "DELETE": 0,
+                            "OTHER": 0,
+                        },
                         "avg_duration_ms": 0,
                         "max_duration_ms": 0,
                     },
@@ -103,7 +109,7 @@ class TrimTelemetryRunner(DiscoverRunner):
             self.run_id,
             stream=kwargs.get("stream"),
             descriptions=kwargs.get("descriptions"),
-            verbosity=kwargs.get("verbosity")
+            verbosity=kwargs.get("verbosity"),
         )
 
         # Run the suite
