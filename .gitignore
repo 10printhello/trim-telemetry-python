@@ -129,3 +129,6 @@ dmypy.json
 .pyre/
 
 run_*
+
+log_*
+logs*
