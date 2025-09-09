@@ -8,6 +8,8 @@ import time
 import unittest
 from datetime import datetime
 from django.test.runner import DiscoverRunner
+from django.test.utils import CaptureQueriesContext
+from django.db import connection
 
 
 class TelemetryTestResult(unittest.TextTestResult):
@@ -28,12 +30,16 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.run_id = run_id
         self.test_status = {}
         self.test_timings = {}
+        self.test_queries = {}  # Store queries for each test
 
     def startTest(self, test):
         super().startTest(test)
         test_id = str(test)
         self.test_status[test_id] = "running"
         self.test_timings[test_id] = time.time()
+
+        # Start capturing database queries for this test
+        self.test_queries[test_id] = CaptureQueriesContext(connection)
 
         # Add progress indicator for long-running tests
         if hasattr(self, "_test_count"):
@@ -72,6 +78,9 @@ class TelemetryTestResult(unittest.TextTestResult):
         start_time = self.test_timings.get(test_id, end_time)
         duration_ms = round((end_time - start_time) * 1000)
 
+        # Collect database telemetry
+        database_telemetry = self._collect_database_telemetry(test_id)
+
         test_telemetry = {
             "run_id": self.run_id,
             "id": test_id,
@@ -84,21 +93,7 @@ class TelemetryTestResult(unittest.TextTestResult):
             "duration_ms": duration_ms,
             "start_time": datetime.fromtimestamp(start_time).isoformat(),
             "end_time": datetime.fromtimestamp(end_time).isoformat(),
-            "database": {
-                "count": 0,
-                "total_duration_ms": 0,
-                "slow_queries": [],
-                "duplicate_queries": [],
-                "query_types": {
-                    "SELECT": 0,
-                    "INSERT": 0,
-                    "UPDATE": 0,
-                    "DELETE": 0,
-                    "OTHER": 0,
-                },
-                "avg_duration_ms": 0,
-                "max_duration_ms": 0,
-            },
+            "database": database_telemetry,
             "network": {
                 "calls_attempted": 0,
                 "calls_blocked": 0,
@@ -123,6 +118,146 @@ class TelemetryTestResult(unittest.TextTestResult):
             print(
                 f"DEBUG: Progress - {self._completed_count} tests completed", flush=True
             )
+
+    def _collect_database_telemetry(self, test_id):
+        """Collect database telemetry for a test."""
+        try:
+            # Get the captured queries for this test
+            query_context = self.test_queries.get(test_id)
+            if not query_context:
+                return {
+                    "count": 0,
+                    "total_duration_ms": 0,
+                    "slow_queries": [],
+                    "duplicate_queries": [],
+                    "query_types": {
+                        "SELECT": 0,
+                        "INSERT": 0,
+                        "UPDATE": 0,
+                        "DELETE": 0,
+                        "OTHER": 0,
+                    },
+                    "avg_duration_ms": 0,
+                    "max_duration_ms": 0,
+                }
+
+            # Get the captured queries
+            queries = query_context.captured_queries
+            query_count = len(queries)
+
+            if query_count == 0:
+                return {
+                    "count": 0,
+                    "total_duration_ms": 0,
+                    "slow_queries": [],
+                    "duplicate_queries": [],
+                    "query_types": {
+                        "SELECT": 0,
+                        "INSERT": 0,
+                        "UPDATE": 0,
+                        "DELETE": 0,
+                        "OTHER": 0,
+                    },
+                    "avg_duration_ms": 0,
+                    "max_duration_ms": 0,
+                }
+
+            # Analyze queries
+            total_duration = 0
+            slow_queries = []
+            query_types = {
+                "SELECT": 0,
+                "INSERT": 0,
+                "UPDATE": 0,
+                "DELETE": 0,
+                "OTHER": 0,
+            }
+            query_signatures = {}
+            max_duration = 0
+
+            for query in queries:
+                duration = query.get("time", 0)
+                total_duration += duration
+                max_duration = max(max_duration, duration)
+
+                # Track slow queries (> 10ms)
+                if duration > 0.01:  # 10ms
+                    slow_queries.append(
+                        {
+                            "sql": query.get("sql", "")[:200] + "..."
+                            if len(query.get("sql", "")) > 200
+                            else query.get("sql", ""),
+                            "duration_ms": round(duration * 1000),
+                        }
+                    )
+
+                # Count query types
+                sql = query.get("sql", "").upper().strip()
+                if sql.startswith("SELECT"):
+                    query_types["SELECT"] += 1
+                elif sql.startswith("INSERT"):
+                    query_types["INSERT"] += 1
+                elif sql.startswith("UPDATE"):
+                    query_types["UPDATE"] += 1
+                elif sql.startswith("DELETE"):
+                    query_types["DELETE"] += 1
+                else:
+                    query_types["OTHER"] += 1
+
+                # Track duplicate queries (same SQL)
+                sql_signature = sql[:100]  # First 100 chars for signature
+                if sql_signature in query_signatures:
+                    query_signatures[sql_signature] += 1
+                else:
+                    query_signatures[sql_signature] = 1
+
+            # Find duplicate queries
+            duplicate_queries = []
+            for signature, count in query_signatures.items():
+                if count > 1:
+                    duplicate_queries.append(
+                        {
+                            "sql": signature + "..."
+                            if len(signature) > 100
+                            else signature,
+                            "count": count,
+                        }
+                    )
+
+            # Calculate averages
+            avg_duration = (total_duration / query_count) if query_count > 0 else 0
+
+            return {
+                "count": query_count,
+                "total_duration_ms": round(total_duration * 1000),
+                "slow_queries": slow_queries,
+                "duplicate_queries": duplicate_queries,
+                "query_types": query_types,
+                "avg_duration_ms": round(avg_duration * 1000),
+                "max_duration_ms": round(max_duration * 1000),
+            }
+
+        except Exception as e:
+            # If there's any error collecting database telemetry, return zeros
+            print(
+                f"DEBUG: Error collecting database telemetry for {test_id}: {e}",
+                flush=True,
+            )
+            return {
+                "count": 0,
+                "total_duration_ms": 0,
+                "slow_queries": [],
+                "duplicate_queries": [],
+                "query_types": {
+                    "SELECT": 0,
+                    "INSERT": 0,
+                    "UPDATE": 0,
+                    "DELETE": 0,
+                    "OTHER": 0,
+                },
+                "avg_duration_ms": 0,
+                "max_duration_ms": 0,
+            }
 
 
 class TrimTelemetryRunner(DiscoverRunner):
