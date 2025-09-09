@@ -11,6 +11,9 @@ from django.test.runner import DiscoverRunner
 from django.test.utils import CaptureQueriesContext
 from django.db import connection, reset_queries
 from django.conf import settings
+import urllib.request
+import urllib.error
+import urllib.parse
 
 
 class TelemetryTestResult(unittest.TextTestResult):
@@ -32,6 +35,7 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.test_status = {}
         self.test_timings = {}
         self.test_queries = {}  # Store queries for each test
+        self.test_network_calls = {}  # Store network calls for each test
 
         # Enable query logging if not already enabled
         self._ensure_query_logging_enabled()
@@ -51,6 +55,70 @@ class TelemetryTestResult(unittest.TextTestResult):
         except Exception as e:
             print(f"DEBUG: Error enabling query logging: {e}", flush=True)
 
+    def _start_network_monitoring(self, test_id):
+        """Start monitoring network calls for a test."""
+        try:
+            # Store original urllib methods
+            self.test_network_calls[test_id] = {
+                'calls': [],
+                'original_urlopen': urllib.request.urlopen,
+                'original_request': getattr(urllib.request, 'Request', None)
+            }
+            
+            # Patch urllib.request.urlopen to track calls
+            def tracked_urlopen(*args, **kwargs):
+                start_time = time.time()
+                url = args[0] if args else kwargs.get('url', 'unknown')
+                method = 'GET'  # Default for urlopen
+                
+                try:
+                    # Make the actual call
+                    result = self.test_network_calls[test_id]['original_urlopen'](*args, **kwargs)
+                    duration_ms = round((time.time() - start_time) * 1000)
+                    
+                    # Log the successful call
+                    self.test_network_calls[test_id]['calls'].append({
+                        'url': str(url),
+                        'method': method,
+                        'duration_ms': duration_ms,
+                        'status': 'success'
+                    })
+                    
+                    return result
+                except Exception as e:
+                    duration_ms = round((time.time() - start_time) * 1000)
+                    
+                    # Log the failed call
+                    self.test_network_calls[test_id]['calls'].append({
+                        'url': str(url),
+                        'method': method,
+                        'duration_ms': duration_ms,
+                        'status': 'error',
+                        'error': str(e)
+                    })
+                    
+                    raise
+            
+            # Apply the patch
+            urllib.request.urlopen = tracked_urlopen
+            
+        except Exception as e:
+            print(f"DEBUG: Error starting network monitoring for {test_id}: {e}", flush=True)
+
+    def _stop_network_monitoring(self, test_id):
+        """Stop monitoring network calls for a test."""
+        try:
+            if test_id in self.test_network_calls:
+                # Restore original urllib methods
+                network_data = self.test_network_calls[test_id]
+                if 'original_urlopen' in network_data:
+                    urllib.request.urlopen = network_data['original_urlopen']
+                
+                # Clean up
+                del self.test_network_calls[test_id]
+        except Exception as e:
+            print(f"DEBUG: Error stopping network monitoring for {test_id}: {e}", flush=True)
+
     def startTest(self, test):
         super().startTest(test)
         test_id = str(test)
@@ -62,6 +130,12 @@ class TelemetryTestResult(unittest.TextTestResult):
 
         # Store initial query count for this test (simpler approach)
         self.test_queries[test_id] = len(connection.queries)
+
+        # Initialize network call tracking for this test
+        self.test_network_calls[test_id] = []
+
+        # Start network call monitoring for this test
+        self._start_network_monitoring(test_id)
 
         # Add progress indicator for long-running tests
         if hasattr(self, "_test_count"):
@@ -103,6 +177,10 @@ class TelemetryTestResult(unittest.TextTestResult):
         # Collect database telemetry and clean up
         database_telemetry = self._collect_database_telemetry(test_id)
         self._cleanup_test_queries(test_id)
+        
+        # Collect network telemetry and clean up
+        network_telemetry = self._collect_network_telemetry(test_id)
+        self._stop_network_monitoring(test_id)
 
         test_telemetry = {
             "run_id": self.run_id,
@@ -117,13 +195,7 @@ class TelemetryTestResult(unittest.TextTestResult):
             "start_time": datetime.fromtimestamp(start_time).isoformat(),
             "end_time": datetime.fromtimestamp(end_time).isoformat(),
             "database": database_telemetry,
-            "network": {
-                "calls_attempted": 0,
-                "calls_blocked": 0,
-                "total_duration": 0,
-                "external_calls": [],
-                "blocked_calls": [],
-            },
+            "network": network_telemetry,
             "test_performance": {
                 "duration_ms": duration_ms,
             },
@@ -297,6 +369,44 @@ class TelemetryTestResult(unittest.TextTestResult):
                 flush=True,
             )
             return self._get_empty_database_telemetry()
+
+    def _collect_network_telemetry(self, test_id):
+        """Collect network telemetry for a test."""
+        try:
+            network_data = self.test_network_calls.get(test_id, {})
+            calls = network_data.get('calls', [])
+            
+            if not calls:
+                return {
+                    "calls_attempted": 0,
+                    "calls_blocked": 0,
+                    "total_duration_ms": 0,
+                    "external_calls": [],
+                    "blocked_calls": [],
+                }
+            
+            # Analyze network calls
+            total_duration = sum(call.get('duration_ms', 0) for call in calls)
+            successful_calls = [call for call in calls if call.get('status') == 'success']
+            failed_calls = [call for call in calls if call.get('status') == 'error']
+            
+            return {
+                "calls_attempted": len(calls),
+                "calls_blocked": 0,  # We don't block, just log
+                "total_duration_ms": total_duration,
+                "external_calls": successful_calls,
+                "blocked_calls": failed_calls,  # Failed calls go here
+            }
+            
+        except Exception as e:
+            print(f"DEBUG: Error collecting network telemetry for {test_id}: {e}", flush=True)
+            return {
+                "calls_attempted": 0,
+                "calls_blocked": 0,
+                "total_duration_ms": 0,
+                "external_calls": [],
+                "blocked_calls": [],
+            }
 
 
 class TrimTelemetryRunner(DiscoverRunner):
