@@ -155,7 +155,7 @@ class TelemetryTestResult(unittest.TextTestResult):
         return {
             "count": 0,
             "total_duration_ms": 0,
-            "slow_queries": [],
+            "queries": [],
             "duplicate_queries": [],
             "query_types": {
                 "SELECT": 0,
@@ -193,8 +193,14 @@ class TelemetryTestResult(unittest.TextTestResult):
                 # Debug: Show first query structure
                 if test_queries:
                     first_query = test_queries[0]
-                    print(f"DEBUG: First query keys: {list(first_query.keys())}", flush=True)
-                    print(f"DEBUG: First query time type: {type(first_query.get('time', 'N/A'))}", flush=True)
+                    print(
+                        f"DEBUG: First query keys: {list(first_query.keys())}",
+                        flush=True,
+                    )
+                    print(
+                        f"DEBUG: First query time type: {type(first_query.get('time', 'N/A'))}",
+                        flush=True,
+                    )
             elif initial_count == 0 and len(current_queries) > 0:
                 print(
                     f"DEBUG: Test {test_id} - total queries in connection: {len(current_queries)}",
@@ -206,7 +212,7 @@ class TelemetryTestResult(unittest.TextTestResult):
 
             # Analyze queries
             total_duration = 0
-            slow_queries = []
+            all_queries = []
             query_types = {
                 "SELECT": 0,
                 "INSERT": 0,
@@ -224,20 +230,19 @@ class TelemetryTestResult(unittest.TextTestResult):
                     duration = float(duration_raw) if duration_raw else 0
                 except (ValueError, TypeError):
                     duration = 0
-                
+
                 total_duration += duration
                 max_duration = max(max_duration, duration)
 
-                # Track slow queries (> 10ms)
-                if duration > 0.01:  # 10ms
-                    slow_queries.append(
-                        {
-                            "sql": query.get("sql", "")[:200] + "..."
-                            if len(query.get("sql", "")) > 200
-                            else query.get("sql", ""),
-                            "duration_ms": round(duration * 1000),
-                        }
-                    )
+                # Store all queries with their details (no judgment calls)
+                all_queries.append(
+                    {
+                        "sql": query.get("sql", "")[:200] + "..."
+                        if len(query.get("sql", "")) > 200
+                        else query.get("sql", ""),
+                        "duration_ms": round(duration * 1000),
+                    }
+                )
 
                 # Count query types
                 sql = query.get("sql", "").upper().strip()
@@ -278,7 +283,7 @@ class TelemetryTestResult(unittest.TextTestResult):
             return {
                 "count": query_count,
                 "total_duration_ms": round(total_duration * 1000),
-                "slow_queries": slow_queries,
+                "queries": all_queries,
                 "duplicate_queries": duplicate_queries,
                 "query_types": query_types,
                 "avg_duration_ms": round(avg_duration * 1000),
