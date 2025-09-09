@@ -30,6 +30,13 @@ class TrimTelemetryRunner(DiscoverRunner):
         # Track test durations for percentile calculations
         self.test_durations = []
 
+        # Debug: Print discovery settings
+        print(f"DEBUG: Test discovery settings:", flush=True)
+        print(f"  - verbosity: {self.verbosity}", flush=True)
+        print(f"  - interactive: {self.interactive}", flush=True)
+        print(f"  - keepdb: {self.keepdb}", flush=True)
+        print(f"  - debug_mode: {self.debug_mode}", flush=True)
+
     def run_suite(self, suite, **kwargs):
         """Run test suite with instrumentation."""
 
@@ -256,15 +263,55 @@ class TrimTelemetryRunner(DiscoverRunner):
         self.telemetry_collector.start_test_run()
 
         try:
+            # Debug: Print test labels being used
+            print(f"DEBUG: Test labels: {test_labels}", flush=True)
+
             # Run tests with instrumentation using run_suite to get proper test result
             suite = self.build_suite(test_labels)
+
+            # Debug: Count tests in suite
+            total_tests_in_suite = suite.countTestCases()
+            print(f"DEBUG: Suite contains {total_tests_in_suite} tests", flush=True)
+
+            # Debug: Try to get more info about the suite
+            if hasattr(suite, "_tests"):
+                print(
+                    f"DEBUG: Suite has {len(suite._tests)} top-level test groups",
+                    flush=True,
+                )
+                for i, test_group in enumerate(suite._tests[:5]):  # Show first 5
+                    if hasattr(test_group, "countTestCases"):
+                        print(
+                            f"  Group {i}: {test_group.countTestCases()} tests",
+                            flush=True,
+                        )
+
+            # Debug: Compare with standard Django runner
+            from django.test.runner import DiscoverRunner
+
+            standard_runner = DiscoverRunner()
+            standard_suite = standard_runner.build_suite(test_labels)
+            standard_count = standard_suite.countTestCases()
+            print(
+                f"DEBUG: Standard Django runner would find {standard_count} tests",
+                flush=True,
+            )
+
             result = self.run_suite(suite)
 
             # Output final summary with proper test counts
             total_tests = result.testsRun
-            passed_tests = total_tests - len(result.failures) - len(result.errors)
             failed_tests = len(result.failures) + len(result.errors)
             skipped_tests = len(result.skipped) if hasattr(result, "skipped") else 0
+            passed_tests = total_tests - failed_tests - skipped_tests
+            
+            # Debug: Print detailed test counts
+            print(f"DEBUG: Test count breakdown:", flush=True)
+            print(f"  - total_tests: {total_tests}", flush=True)
+            print(f"  - failures: {len(result.failures)}", flush=True)
+            print(f"  - errors: {len(result.errors)}", flush=True)
+            print(f"  - skipped: {skipped_tests}", flush=True)
+            print(f"  - calculated passed: {passed_tests}", flush=True)
 
             summary_data = {
                 "run_id": self.run_id,
