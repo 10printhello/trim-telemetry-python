@@ -47,10 +47,6 @@ class TrimTelemetryRunner(DiscoverRunner):
             def startTest(self, test):
                 super().startTest(test)
                 self.telemetry_collector.start_test(test)
-                # Start query capture for this test
-                test_id = str(test)
-                # Clear connection queries at start of test for isolation
-                connection.queries_log.clear()
 
             def addSuccess(self, test):
                 super().addSuccess(test)
@@ -72,10 +68,10 @@ class TrimTelemetryRunner(DiscoverRunner):
                 # Get database query info for THIS test only
                 test_id = str(test)
 
-                # Get queries from connection.queries (simpler, less intrusive)
-                test_queries = connection.queries
-                queries = len(test_queries)
-                query_time = sum(float(q["time"]) for q in test_queries)
+                # Temporarily disable database telemetry to avoid connection issues
+                test_queries = []
+                queries = 0
+                query_time = 0
 
                 # Debug: Log query information
                 print(
