@@ -21,9 +21,9 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
             # Reset any existing queries
             reset_queries()
 
-            # Enable query logging in settings (Django best practice)
-            if not getattr(settings, "DEBUG", False):
-                settings.DEBUG = True
+            # Note: Django's test runner already enables query logging for tests
+            # We don't need to modify settings.DEBUG as it can interfere with
+            # database setup/teardown behavior
         except Exception:
             # Silently handle errors - telemetry should not break tests
             pass
