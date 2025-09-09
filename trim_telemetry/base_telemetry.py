@@ -5,6 +5,7 @@ Base telemetry collection logic shared across test runners
 import json
 import time
 import threading
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
@@ -19,6 +20,40 @@ class BaseTelemetryCollector:
         self.test_queries = {}  # Store queries for each test
         self.test_network_calls = {}  # Store network calls for each test
         self._thread_local = threading.local()
+
+        # Set up telemetry file
+        self.telemetry_dir = os.path.join(os.getcwd(), ".telemetry")
+        self.telemetry_file = os.path.join(self.telemetry_dir, f"{run_id}.ndjson")
+        self._ensure_telemetry_file()
+
+    def _ensure_telemetry_file(self):
+        """Ensure the telemetry directory and file exist and are writable."""
+        try:
+            # Create the .telemetry directory if it doesn't exist
+            if not os.path.exists(self.telemetry_dir):
+                os.makedirs(self.telemetry_dir, exist_ok=True)
+
+            # Create the file if it doesn't exist
+            if not os.path.exists(self.telemetry_file):
+                with open(self.telemetry_file, "w") as f:
+                    pass  # Create empty file
+        except Exception:
+            # If we can't create the file, fall back to stdout
+            self.telemetry_file = None
+
+    def _write_telemetry(self, data: Dict[str, Any]):
+        """Write telemetry data to file or stdout."""
+        try:
+            if self.telemetry_file:
+                with open(self.telemetry_file, "a") as f:
+                    f.write(json.dumps(data) + "\n")
+                    f.flush()
+            else:
+                # Fallback to stdout if file writing fails
+                print(json.dumps(data), flush=True)
+        except Exception:
+            # If file writing fails, fall back to stdout
+            print(json.dumps(data), flush=True)
 
     def start_test(self, test, test_id: str = None):
         """Start tracking a test."""
@@ -145,8 +180,8 @@ class BaseTelemetryCollector:
         pass
 
     def output_test_telemetry(self, test_telemetry: Dict[str, Any]):
-        """Output test telemetry in the standard format."""
-        print(f"TEST_RESULT:{json.dumps(test_telemetry)}", flush=True)
+        """Output test telemetry to .telemetry file."""
+        self._write_telemetry(test_telemetry)
 
     def output_test_summary(
         self,
@@ -155,7 +190,7 @@ class BaseTelemetryCollector:
         failed_tests: int,
         skipped_tests: int = 0,
     ):
-        """Output test run summary."""
+        """Output test run summary to .telemetry file."""
         summary_data = {
             "run_id": self.run_id,
             "type": "test_run_summary",
@@ -165,4 +200,4 @@ class BaseTelemetryCollector:
             "skipped_tests": skipped_tests,
             "exit_code": 0 if failed_tests == 0 else 1,
         }
-        print(f"TEST_SUMMARY:{json.dumps(summary_data)}", flush=True)
+        self._write_telemetry(summary_data)

@@ -218,12 +218,82 @@ The package outputs comprehensive structured telemetry data for each test:
 
 ## Output Format
 
-The telemetry data is output in real-time as tests execute. Each test produces a JSON line prefixed with `TEST_RESULT:`:
+The telemetry data is written to a **`.telemetry/`** folder in the current working directory. Each test run creates a new file named with the run ID and timestamp in **NDJSON format** (Newline Delimited JSON).
 
+**File structure:**
 ```
-TEST_RESULT:{"run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", ...}
-TEST_RESULT:{"run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", ...}
-TEST_SUMMARY:{"run_id": "run_20250909_143808", "type": "test_run_summary", "total_tests": 25, "passed_tests": 23, "failed_tests": 2, "skipped_tests": 0, "exit_code": 1}
+.telemetry/
+├── run_20250909_143808.ndjson
+├── run_20250909_144512.ndjson
+└── run_20250909_145123.ndjson
+```
+
+**File contents (e.g., `run_20250909_143808.ndjson`):**
+```
+{"run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", "status": "passed", "duration_ms": 1250, ...}
+{"run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", "status": "passed", "duration_ms": 890, ...}
+{"run_id": "run_20250909_143808", "type": "test_run_summary", "total_tests": 25, "passed_tests": 23, "failed_tests": 2, "skipped_tests": 0, "exit_code": 1}
+```
+
+### **Folder-Based Output Benefits:**
+- **Organized**: All telemetry files in one `.telemetry/` folder
+- **Multiple Runs**: Each test run gets its own file (no overwrites)
+- **Timestamped**: Files named with run ID and datetime for easy identification
+- **Clean Separation**: Test output goes to stdout, telemetry goes to files
+- **Persistent Data**: Telemetry is saved for later analysis
+- **No Interference**: Doesn't mix with test output or logs
+- **Easy Access**: Go tool can read from specific files or process all files
+- **Streaming**: Data can be processed line-by-line as tests execute
+- **Efficient**: No need to parse large JSON arrays
+- **Go-friendly**: Perfect for Go's `json.Decoder` with `Decode()` in a loop
+
+### **Go Integration Example:**
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "os"
+)
+
+type TestResult struct {
+    RunID     string `json:"run_id"`
+    ID        string `json:"id"`
+    Name      string `json:"name"`
+    Status    string `json:"status"`
+    Duration  int    `json:"duration_ms"`
+    // ... other fields
+}
+
+func main() {
+    decoder := json.NewDecoder(os.Stdin)
+    
+    for {
+        var result TestResult
+        if err := decoder.Decode(&result); err != nil {
+            break // End of stream
+        }
+        
+        // Process each test result as it arrives
+        fmt.Printf("Test %s: %s (%dms)\n", result.Name, result.Status, result.Duration)
+    }
+}
+```
+
+### **Usage with Go Analysis Tool:**
+```bash
+# Run tests (telemetry automatically written to .telemetry/ folder)
+python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner
+
+# Process latest telemetry file
+go run analysis.go .telemetry/run_20250909_143808.ndjson
+
+# Process all telemetry files
+go run analysis.go .telemetry/
+
+# Or stream latest telemetry as it's written
+tail -f .telemetry/run_20250909_143808.ndjson | go run analysis.go
 ```
 
 ### 📈 **Interpreting Telemetry Data**
