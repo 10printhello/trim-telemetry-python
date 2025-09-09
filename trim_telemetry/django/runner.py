@@ -6,7 +6,7 @@ import sys
 import unittest
 from datetime import datetime
 from django.test.runner import DiscoverRunner
-from .django_telemetry import DjangoTelemetryCollector
+from .telemetry import DjangoTelemetryCollector
 
 
 class TelemetryTestResult(unittest.TextTestResult):
@@ -51,7 +51,7 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.telemetry_collector.output_test_telemetry(test_telemetry)
 
 
-class TrimTelemetryRunner(DiscoverRunner):
+class TelemetryTestRunner(DiscoverRunner):
     """Django test runner with telemetry collection."""
 
     def __init__(self, *args, **kwargs):
@@ -91,3 +91,28 @@ class TrimTelemetryRunner(DiscoverRunner):
             )
 
         return result
+
+
+def main():
+    """Main entry point for Django telemetry runner."""
+    import os
+    import django
+
+    # Set up Django environment
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
+    django.setup()
+
+    # Get all arguments except the script name
+    test_args = sys.argv[1:]
+
+    # Create test runner
+    runner = TelemetryTestRunner()
+
+    # Run tests
+    result = runner.run_tests(test_args)
+
+    sys.exit(0 if result.wasSuccessful() else 1)
+
+
+if __name__ == "__main__":
+    main()

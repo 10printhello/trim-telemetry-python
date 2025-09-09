@@ -5,7 +5,7 @@ Django-specific telemetry collection
 import urllib.request
 from django.db import connection, reset_queries
 from django.conf import settings
-from .base_telemetry import BaseTelemetryCollector
+from ..base_telemetry import BaseTelemetryCollector
 
 
 class DjangoTelemetryCollector(BaseTelemetryCollector):

@@ -33,46 +33,49 @@ pip install django_coverage_plugin
 #### **Using the New Test Runner**
 
 ```bash
-# Basic usage with custom test runner
-python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner
+# Method 1: Direct execution (requires Django environment setup)
+python -m trim_telemetry.django [test-args]
+
+# Method 2: Via manage.py (recommended for Django projects)
+python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner
 
 # With specific test modules
-python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner core.tests.test_models
+python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner core.tests.test_models
 
 # With keepdb for faster runs
-python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner --keepdb
+python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner --keepdb
 
 # With Docker
-ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner
+ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner
 ```
 
 ### Pytest Tests (New)
 
 ```bash
 # Basic usage
-python -m trim_telemetry.pytest_runner
+python -m trim_telemetry.pytest
 
 # With specific test files
-python -m trim_telemetry.pytest_runner tests/test_models.py
+python -m trim_telemetry.pytest tests/test_models.py
 
 # With test discovery
-python -m trim_telemetry.pytest_runner tests/
+python -m trim_telemetry.pytest tests/
 
 # With pytest options
-python -m trim_telemetry.pytest_runner -v --tb=short
+python -m trim_telemetry.pytest -v --tb=short
 ```
 
 ### Unittest Tests (New)
 
 ```bash
 # Basic usage (auto-discovers tests)
-python -m trim_telemetry.unittest_runner
+python -m trim_telemetry.unittest
 
 # With specific test modules
-python -m trim_telemetry.unittest_runner test_models test_views
+python -m trim_telemetry.unittest test_models test_views
 
 # With specific test classes
-python -m trim_telemetry.unittest_runner test_models.TestUserModel
+python -m trim_telemetry.unittest test_models.TestUserModel
 ```
 
 
@@ -83,16 +86,19 @@ python -m trim_telemetry.unittest_runner test_models.TestUserModel
 pip install trim-telemetry
 
 # Django with new test runner (recommended)
-make collect TEST_COMMAND="python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner"
+make collect TEST_COMMAND="python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner"
+
+# Django with direct execution
+make collect TEST_COMMAND="python -m trim_telemetry.django"
 
 # Pytest with new runner
-make collect TEST_COMMAND="python -m trim_telemetry.pytest_runner tests/"
+make collect TEST_COMMAND="python -m trim_telemetry.pytest tests/"
 
 # Unittest with new runner
-make collect TEST_COMMAND="python -m trim_telemetry.unittest_runner"
+make collect TEST_COMMAND="python -m trim_telemetry.unittest"
 
 # Docker Django with new test runner
-make collect TEST_COMMAND="ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner"
+make collect TEST_COMMAND="ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner"
 
 ```
 
@@ -100,13 +106,16 @@ make collect TEST_COMMAND="ENVIRONMENT=testing python manage.py test --testrunne
 
 ### 🏗️ **New Clean Architecture (Recommended)**
 
-The package now uses a clean, modular architecture with shared telemetry logic:
+The package now uses a clean, modular architecture organized by framework:
 
 - **`base_telemetry.py`**: Shared telemetry collection logic
-- **`django_telemetry.py`**: Django-specific database and network monitoring
-- **`django_runner.py`**: Django test runner using shared telemetry
-- **`pytest_runner.py`**: Pytest runner with telemetry collection
-- **`unittest_runner.py`**: Unittest runner with telemetry collection
+- **`django/`**: Django framework integration
+  - **`telemetry.py`**: Django-specific database and network monitoring
+  - **`runner.py`**: Django test runner using shared telemetry
+- **`pytest/`**: Pytest framework integration
+  - **`runner.py`**: Pytest runner with telemetry collection
+- **`unittest/`**: Unittest framework integration
+  - **`runner.py`**: Unittest runner with telemetry collection
 
 
 ## Features

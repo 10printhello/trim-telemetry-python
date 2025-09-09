@@ -4,7 +4,7 @@ Pytest test runner with telemetry collection
 
 import sys
 from datetime import datetime
-from .base_telemetry import BaseTelemetryCollector
+from ..base_telemetry import BaseTelemetryCollector
 
 
 class PytestTelemetryCollector(BaseTelemetryCollector):

@@ -5,7 +5,7 @@ Unittest test runner with telemetry collection
 import sys
 import unittest
 from datetime import datetime
-from .base_telemetry import BaseTelemetryCollector
+from ..base_telemetry import BaseTelemetryCollector
 
 
 class UnittestTelemetryCollector(BaseTelemetryCollector):
@@ -100,7 +100,7 @@ class TelemetryTestResult(unittest.TextTestResult):
         super().stopTest(test)
 
 
-class TrimUnittestRunner(unittest.TextTestRunner):
+class TelemetryTestRunner(unittest.TextTestRunner):
     """Unittest test runner with telemetry collection."""
 
     def __init__(self, *args, **kwargs):
@@ -164,7 +164,7 @@ def main():
         suite = loader.discover(".", pattern="test_*.py")
 
     # Run tests with our custom runner
-    runner = TrimUnittestRunner(verbosity=2)
+    runner = TelemetryTestRunner(verbosity=2)
     result = runner.run(suite)
 
     sys.exit(0 if result.wasSuccessful() else 1)
