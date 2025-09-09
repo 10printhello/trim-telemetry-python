@@ -58,21 +58,26 @@ class TelemetryTestResult(unittest.TextTestResult):
     def _start_network_monitoring(self, test_id):
         """Start monitoring network calls for a test."""
         try:
-            # Store original urllib methods
+            # Store original urllib methods and initialize call tracking
             self.test_network_calls[test_id] = {
                 "calls": [],
                 "original_urlopen": urllib.request.urlopen,
                 "original_request": getattr(urllib.request, "Request", None),
             }
 
-            # Patch urllib.request.urlopen to track calls
+            # Create a tracked version that only logs calls from this specific test
             def tracked_urlopen(*args, **kwargs):
+                # Only track if this is called during our test's execution
+                if test_id not in self.test_network_calls:
+                    # Fall back to original if test is no longer active
+                    return self.test_network_calls.get(test_id, {}).get("original_urlopen", urllib.request.urlopen)(*args, **kwargs)
+                
                 start_time = time.time()
                 url = args[0] if args else kwargs.get("url", "unknown")
                 method = "GET"  # Default for urlopen
 
                 try:
-                    # Make the actual call
+                    # Make the actual call using the original function
                     result = self.test_network_calls[test_id]["original_urlopen"](
                         *args, **kwargs
                     )
@@ -147,7 +152,8 @@ class TelemetryTestResult(unittest.TextTestResult):
         self.test_network_calls[test_id] = []
 
         # Start network call monitoring for this test
-        self._start_network_monitoring(test_id)
+        # Temporarily disabled to test if this causes database locking
+        # self._start_network_monitoring(test_id)
 
         # Add progress indicator for long-running tests
         if hasattr(self, "_test_count"):
@@ -192,7 +198,7 @@ class TelemetryTestResult(unittest.TextTestResult):
 
         # Collect network telemetry and clean up
         network_telemetry = self._collect_network_telemetry(test_id)
-        self._stop_network_monitoring(test_id)
+        # self._stop_network_monitoring(test_id)
 
         test_telemetry = {
             "run_id": self.run_id,
