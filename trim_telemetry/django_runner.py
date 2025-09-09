@@ -1,5 +1,5 @@
 """
-Django test runner with minimal telemetry
+Django test runner telemetry
 """
 
 import json
