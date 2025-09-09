@@ -28,78 +28,56 @@ pip install django_coverage_plugin
 
 ## Usage
 
-### Django Tests
+### Django Tests (Recommended)
 
-#### **Using the Custom Test Runner (Recommended)**
+#### **Using the New Test Runner**
 
 ```bash
-# Basic usage with custom test runner
-python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner
+# Method 1: Direct execution (requires Django environment setup)
+python -m trim_telemetry.django [test-args]
+
+# Method 2: Via manage.py (recommended for Django projects)
+python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner
 
 # With specific test modules
-python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner core.tests.test_models
+python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner core.tests.test_models
 
 # With keepdb for faster runs
-python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner --keepdb
+python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner --keepdb
 
 # With Docker
-ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner
+ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner
 ```
 
-#### **Using the Legacy Instrumentation Module**
+### Pytest Tests (New)
 
 ```bash
 # Basic usage
-python -m trim_telemetry.django_instrumentation manage.py test
-
-# With custom settings
-python -m trim_telemetry.django_instrumentation --settings=myapp.settings_test manage.py test
-
-# With specific test arguments
-python -m trim_telemetry.django_instrumentation manage.py test myapp.tests
-
-# With Docker
-ENVIRONMENT=testing python -m trim_telemetry.django_instrumentation manage.py test
-```
-
-#### **Coverage Collection (Optional)**
-
-To enable code coverage collection, install the coverage package:
-
-```bash
-pip install coverage
-```
-
-Coverage data will be automatically collected and included in the telemetry output.
-
-### Pytest Tests
-
-```bash
-# Basic usage
-python -m trim_telemetry.pytest_instrumentation
+python -m trim_telemetry.pytest
 
 # With specific test files
-python -m trim_telemetry.pytest_instrumentation tests/test_models.py
+python -m trim_telemetry.pytest tests/test_models.py
 
 # With test discovery
-python -m trim_telemetry.pytest_instrumentation tests/
+python -m trim_telemetry.pytest tests/
 
 # With pytest options
-python -m trim_telemetry.pytest_instrumentation -v --tb=short
+python -m trim_telemetry.pytest -v --tb=short
 ```
 
-### Unittest Tests
+### Unittest Tests (New)
 
 ```bash
 # Basic usage (auto-discovers tests)
-python -m trim_telemetry.unittest_instrumentation
+python -m trim_telemetry.unittest
 
 # With specific test modules
-python -m trim_telemetry.unittest_instrumentation test_models test_views
+python -m trim_telemetry.unittest test_models test_views
 
 # With specific test classes
-python -m trim_telemetry.unittest_instrumentation test_models.TestUserModel
+python -m trim_telemetry.unittest test_models.TestUserModel
 ```
+
 
 ### With Trim CLI
 
@@ -107,41 +85,55 @@ python -m trim_telemetry.unittest_instrumentation test_models.TestUserModel
 # Install the package in your Python environment
 pip install trim-telemetry
 
-# Django with custom test runner (recommended)
-make collect TEST_COMMAND="python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner"
+# Django with new test runner (recommended)
+make collect TEST_COMMAND="python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner"
 
-# Django with legacy instrumentation
-make collect TEST_COMMAND="python -m trim_telemetry.django_instrumentation manage.py test"
+# Django with direct execution
+make collect TEST_COMMAND="python -m trim_telemetry.django"
 
-# Pytest
-make collect TEST_COMMAND="python -m trim_telemetry.pytest_instrumentation tests/"
+# Pytest with new runner
+make collect TEST_COMMAND="python -m trim_telemetry.pytest tests/"
 
-# Unittest
-make collect TEST_COMMAND="python -m trim_telemetry.unittest_instrumentation"
+# Unittest with new runner
+make collect TEST_COMMAND="python -m trim_telemetry.unittest"
 
-# Docker Django with custom test runner
-make collect TEST_COMMAND="ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django_runner.TrimTelemetryRunner"
+# Docker Django with new test runner
+make collect TEST_COMMAND="ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner"
 
-# Docker Django with legacy instrumentation
-make collect TEST_COMMAND="ENVIRONMENT=testing python -m trim_telemetry.django_instrumentation manage.py test"
 ```
+
+## Architecture
+
+### 🏗️ **New Clean Architecture (Recommended)**
+
+The package now uses a clean, modular architecture organized by framework:
+
+- **`base_telemetry.py`**: Shared telemetry collection logic
+- **`django/`**: Django framework integration
+  - **`telemetry.py`**: Django-specific database and network monitoring
+  - **`runner.py`**: Django test runner using shared telemetry
+- **`pytest/`**: Pytest framework integration
+  - **`runner.py`**: Pytest runner with telemetry collection
+- **`unittest/`**: Unittest framework integration
+  - **`runner.py`**: Unittest runner with telemetry collection
+
 
 ## Features
 
 ### 🎯 **Rich Telemetry Collection**
-- **Database Query Analysis**: Per-test query isolation, slow query detection, duplicate query identification
-- **Performance Metrics**: Accurate P95/P99 percentiles, median, average durations with statistical analysis
-- **Code Coverage**: Real-time coverage collection with file-level breakdown and missing line identification
-- **Network Call Blocking**: Prevents tests from making external HTTP calls with detailed blocking reports
+- **Database Query Analysis**: Per-test query isolation, duplicate query identification
+- **Performance Metrics**: Accurate test duration tracking with millisecond precision
+- **Network Call Monitoring**: Captures external API calls for unmocked test detection
+- **Test Isolation**: Accurate per-test metrics without cross-test contamination
 
 ### 🔧 **Advanced Analytics**
 - **Query Type Breakdown**: SELECT, INSERT, UPDATE, DELETE query categorization
-- **Performance Flags**: Intelligent flagging of slow tests, DB-heavy tests, N+1 query patterns
-- **Statistical Analysis**: Proper percentile calculations across test suite execution
-- **Test Isolation**: Accurate per-test metrics without cross-test contamination
+- **Performance Tracking**: Test duration, database query counts, network call counts
+- **Statistical Analysis**: Per-test metrics with clean telemetry output
+- **Test Status Tracking**: Passed, failed, error, skipped status for each test
 
 ### 🚀 **Framework Support**
-- **Django**: Custom test runner with full Django integration
+- **Django**: Custom test runner with full Django integration and database monitoring
 - **Pytest**: Comprehensive pytest plugin with rich instrumentation
 - **Unittest**: Enhanced unittest runner with telemetry collection
 - **Docker Compatible**: Works seamlessly inside Docker containers
@@ -150,31 +142,29 @@ make collect TEST_COMMAND="ENVIRONMENT=testing python -m trim_telemetry.django_i
 
 The package outputs comprehensive structured telemetry data for each test:
 
-### 📊 **Complete Telemetry Structure**
+### 📊 **Clean Telemetry Structure**
 
 ```json
 {
-  "id": "test_user_creation",
+  "run_id": "run_20250909_143808",
+  "id": "test_user_creation (users.tests.test_models.UserTestCase.test_user_creation)",
   "name": "test_user_creation",
   "class": "UserTestCase", 
-  "module": "users.tests",
-  "file": "users/tests.py",
+  "module": "users.tests.test_models",
+  "file": "users/tests/test_models.py",
   "line": 0,
   "status": "passed",
-  "duration": 1250,
-  "start_time": "2025-09-08T13:30:15.123456",
-  "end_time": "2025-09-08T13:30:16.373456",
-  "tags": [],
-  "fixtures": [],
+  "duration_ms": 1250,
+  "start_time": "2025-09-09T14:38:15.123456",
+  "end_time": "2025-09-09T14:38:16.373456",
   
-  "database_queries": {
+  "database": {
     "count": 15,
-    "total_duration": 245.67,
-    "slow_queries": [
+    "total_duration_ms": 245,
+    "queries": [
       {
         "sql": "SELECT * FROM users WHERE email = 'test@example.com'",
-        "time": 0.156,
-        "duration": 156
+        "duration_ms": 156
       }
     ],
     "duplicate_queries": [
@@ -190,49 +180,18 @@ The package outputs comprehensive structured telemetry data for each test:
       "DELETE": 0,
       "OTHER": 0
     },
-    "avg_duration": 16.38,
-    "max_duration": 156.0
+    "avg_duration_ms": 16,
+    "max_duration_ms": 156
   },
   
-  "http_calls": {
-    "count": 0,
-    "total_duration": 0,
-    "external_calls": [],
-    "blocked_calls": []
+  "network": {
+    "total_calls": 0,
+    "urls": []
   },
   
-  "performance": {
-    "is_slow": false,
-    "is_db_heavy": false,
-    "is_network_heavy": false,
-    "has_blocked_network_calls": false,
-    "current_duration": 1250,
-    "avg_duration": 180,
-    "median_duration": 175,
-    "p95_duration": 420,
-    "p99_duration": 580,
-    "total_tests_run": 15,
-    "flags": ["moderate_db_queries"]
-  },
-  
-  "coverage": {
-    "lines_covered": 1250,
-    "lines_total": 1500,
-    "coverage_percent": 83.33,
-    "files": [
-      {
-        "file": "/path/to/models.py",
-        "lines_covered": 45,
-        "lines_total": 50,
-        "coverage_percent": 90.0,
-        "missing_lines": [23, 45, 67]
-      }
-    ],
-    "status": "collected"
-  },
-  
-  "logs": [],
-  "metadata": {}
+  "test_performance": {
+    "duration_ms": 1250
+  }
 }
 ```
 
@@ -240,58 +199,51 @@ The package outputs comprehensive structured telemetry data for each test:
 
 #### **Database Query Analysis**
 - **Per-test isolation**: Each test shows only its own queries
-- **Slow query detection**: Queries > 100ms with full SQL details
-- **Duplicate detection**: Identifies repeated SQL statements
 - **Query categorization**: Breakdown by SELECT/INSERT/UPDATE/DELETE
-- **Performance metrics**: Average and maximum query durations
+- **Duplicate detection**: Identifies repeated SQL statements
+- **Performance metrics**: Average and maximum query durations in milliseconds
+- **Clean output**: No judgment calls, just raw data for analysis
 
-#### **Performance Analytics**
-- **Statistical percentiles**: Accurate P95/P99 calculations across test suite
-- **Performance flags**: Intelligent detection of slow, DB-heavy, or problematic tests
-- **N+1 detection**: Identifies potential N+1 query patterns
-- **Duration tracking**: Current, average, median, and percentile durations
-
-#### **Code Coverage**
-- **Real-time collection**: Live coverage tracking during test execution
-- **File-level breakdown**: Coverage per file with missing line numbers
-- **Percentage accuracy**: Precise coverage calculations
-- **Status tracking**: Indicates coverage collection success/failure
-
-#### **Network Call Blocking**
-- **External call prevention**: Blocks HTTP requests to prevent test flakiness
-- **Detailed reporting**: Shows which calls were blocked and where
+#### **Network Call Monitoring**
+- **External call detection**: Captures URLs of external API calls
+- **Unmocked test identification**: Helps identify tests that aren't properly mocked
+- **Simple tracking**: Just captures URLs without timing or blocking
 - **Thread-safe**: Works across multiple test threads
+
+#### **Performance Tracking**
+- **Duration precision**: All durations in milliseconds with integer precision
+- **Test status**: Passed, failed, error, skipped status for each test
+- **Run correlation**: Unique run ID to correlate all telemetry from a test run
+- **Clean metrics**: No complex calculations, just raw performance data
 
 ## Output Format
 
 The telemetry data is output in real-time as tests execute. Each test produces a JSON line prefixed with `TEST_RESULT:`:
 
 ```
-TEST_RESULT:{"id": "test_user_creation", "name": "test_user_creation", ...}
-TEST_RESULT:{"id": "test_user_deletion", "name": "test_user_deletion", ...}
-TEST_SUMMARY:{"total_tests": 25, "passed_tests": 23, "failed_tests": 2, "skipped_tests": 0, "exit_code": 1}
+TEST_RESULT:{"run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", ...}
+TEST_RESULT:{"run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", ...}
+TEST_SUMMARY:{"run_id": "run_20250909_143808", "type": "test_run_summary", "total_tests": 25, "passed_tests": 23, "failed_tests": 2, "skipped_tests": 0, "exit_code": 1}
 ```
 
-### 📈 **Interpreting Performance Metrics**
+### 📈 **Interpreting Telemetry Data**
 
-#### **Duration Percentiles**
-- **P95**: 95% of tests run faster than this duration
-- **P99**: 99% of tests run faster than this duration  
-- **Median**: 50% of tests run faster than this duration
-- **Average**: Mean duration across all tests
+#### **Test Performance**
+- **duration_ms**: Test execution time in milliseconds (integer precision)
+- **status**: Test result (passed, failed, error, skipped)
+- **run_id**: Unique identifier to correlate all telemetry from a single test run
 
-#### **Performance Flags**
-- `very_slow`: Test duration > 5 seconds
-- `slow`: Test duration > 1 second
-- `high_db_queries`: > 100 database queries
-- `moderate_db_queries`: > 50 database queries
-- `potential_n_plus_1_queries`: > 10 SELECT queries (possible N+1 pattern)
-- `network_calls_blocked`: Test attempted external HTTP calls
+#### **Database Analysis**
+- **count**: Number of database queries executed during the test
+- **total_duration_ms**: Total time spent on database queries
+- **query_types**: Breakdown by SELECT/INSERT/UPDATE/DELETE operations
+- **duplicate_queries**: Repeated SQL statements within the test
+- **avg_duration_ms**: Average query duration in milliseconds
+- **max_duration_ms**: Slowest query duration in milliseconds
 
-#### **Database Query Analysis**
-- **Slow queries**: Queries taking > 100ms with full SQL
-- **Duplicate queries**: Repeated SQL statements within the test
-- **Query types**: Breakdown by SELECT/INSERT/UPDATE/DELETE operations
+#### **Network Monitoring**
+- **total_calls**: Number of external HTTP calls made during the test
+- **urls**: List of URLs that were called (helps identify unmocked tests)
 
 ## Development
 

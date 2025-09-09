@@ -46,9 +46,10 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "trim-django=trim_telemetry.django_instrumentation:main",
-            "trim-pytest=trim_telemetry.pytest_instrumentation:main",
-            "trim-unittest=trim_telemetry.unittest_instrumentation:main",
+            # Test runners
+            "trim-django=trim_telemetry.django:main",
+            "trim-pytest=trim_telemetry.pytest:main",
+            "trim-unittest=trim_telemetry.unittest:main",
         ],
     },
 )
