@@ -60,50 +60,59 @@ class TelemetryTestResult(unittest.TextTestResult):
         try:
             # Store original urllib methods
             self.test_network_calls[test_id] = {
-                'calls': [],
-                'original_urlopen': urllib.request.urlopen,
-                'original_request': getattr(urllib.request, 'Request', None)
+                "calls": [],
+                "original_urlopen": urllib.request.urlopen,
+                "original_request": getattr(urllib.request, "Request", None),
             }
-            
+
             # Patch urllib.request.urlopen to track calls
             def tracked_urlopen(*args, **kwargs):
                 start_time = time.time()
-                url = args[0] if args else kwargs.get('url', 'unknown')
-                method = 'GET'  # Default for urlopen
-                
+                url = args[0] if args else kwargs.get("url", "unknown")
+                method = "GET"  # Default for urlopen
+
                 try:
                     # Make the actual call
-                    result = self.test_network_calls[test_id]['original_urlopen'](*args, **kwargs)
+                    result = self.test_network_calls[test_id]["original_urlopen"](
+                        *args, **kwargs
+                    )
                     duration_ms = round((time.time() - start_time) * 1000)
-                    
+
                     # Log the successful call
-                    self.test_network_calls[test_id]['calls'].append({
-                        'url': str(url),
-                        'method': method,
-                        'duration_ms': duration_ms,
-                        'status': 'success'
-                    })
-                    
+                    self.test_network_calls[test_id]["calls"].append(
+                        {
+                            "url": str(url),
+                            "method": method,
+                            "duration_ms": duration_ms,
+                            "status": "success",
+                        }
+                    )
+
                     return result
                 except Exception as e:
                     duration_ms = round((time.time() - start_time) * 1000)
-                    
+
                     # Log the failed call
-                    self.test_network_calls[test_id]['calls'].append({
-                        'url': str(url),
-                        'method': method,
-                        'duration_ms': duration_ms,
-                        'status': 'error',
-                        'error': str(e)
-                    })
-                    
+                    self.test_network_calls[test_id]["calls"].append(
+                        {
+                            "url": str(url),
+                            "method": method,
+                            "duration_ms": duration_ms,
+                            "status": "error",
+                            "error": str(e),
+                        }
+                    )
+
                     raise
-            
+
             # Apply the patch
             urllib.request.urlopen = tracked_urlopen
-            
+
         except Exception as e:
-            print(f"DEBUG: Error starting network monitoring for {test_id}: {e}", flush=True)
+            print(
+                f"DEBUG: Error starting network monitoring for {test_id}: {e}",
+                flush=True,
+            )
 
     def _stop_network_monitoring(self, test_id):
         """Stop monitoring network calls for a test."""
@@ -111,13 +120,16 @@ class TelemetryTestResult(unittest.TextTestResult):
             if test_id in self.test_network_calls:
                 # Restore original urllib methods
                 network_data = self.test_network_calls[test_id]
-                if 'original_urlopen' in network_data:
-                    urllib.request.urlopen = network_data['original_urlopen']
-                
+                if "original_urlopen" in network_data:
+                    urllib.request.urlopen = network_data["original_urlopen"]
+
                 # Clean up
                 del self.test_network_calls[test_id]
         except Exception as e:
-            print(f"DEBUG: Error stopping network monitoring for {test_id}: {e}", flush=True)
+            print(
+                f"DEBUG: Error stopping network monitoring for {test_id}: {e}",
+                flush=True,
+            )
 
     def startTest(self, test):
         super().startTest(test)
@@ -177,7 +189,7 @@ class TelemetryTestResult(unittest.TextTestResult):
         # Collect database telemetry and clean up
         database_telemetry = self._collect_database_telemetry(test_id)
         self._cleanup_test_queries(test_id)
-        
+
         # Collect network telemetry and clean up
         network_telemetry = self._collect_network_telemetry(test_id)
         self._stop_network_monitoring(test_id)
@@ -374,8 +386,8 @@ class TelemetryTestResult(unittest.TextTestResult):
         """Collect network telemetry for a test."""
         try:
             network_data = self.test_network_calls.get(test_id, {})
-            calls = network_data.get('calls', [])
-            
+            calls = network_data.get("calls", [])
+
             if not calls:
                 return {
                     "calls_attempted": 0,
@@ -384,12 +396,14 @@ class TelemetryTestResult(unittest.TextTestResult):
                     "external_calls": [],
                     "blocked_calls": [],
                 }
-            
+
             # Analyze network calls
-            total_duration = sum(call.get('duration_ms', 0) for call in calls)
-            successful_calls = [call for call in calls if call.get('status') == 'success']
-            failed_calls = [call for call in calls if call.get('status') == 'error']
-            
+            total_duration = sum(call.get("duration_ms", 0) for call in calls)
+            successful_calls = [
+                call for call in calls if call.get("status") == "success"
+            ]
+            failed_calls = [call for call in calls if call.get("status") == "error"]
+
             return {
                 "calls_attempted": len(calls),
                 "calls_blocked": 0,  # We don't block, just log
@@ -397,9 +411,12 @@ class TelemetryTestResult(unittest.TextTestResult):
                 "external_calls": successful_calls,
                 "blocked_calls": failed_calls,  # Failed calls go here
             }
-            
+
         except Exception as e:
-            print(f"DEBUG: Error collecting network telemetry for {test_id}: {e}", flush=True)
+            print(
+                f"DEBUG: Error collecting network telemetry for {test_id}: {e}",
+                flush=True,
+            )
             return {
                 "calls_attempted": 0,
                 "calls_blocked": 0,
