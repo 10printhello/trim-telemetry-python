@@ -116,7 +116,6 @@ class TelemetryTestRunner(unittest.TextTestRunner):
             self.verbosity,
         )
 
-        start_time = datetime.now().timestamp()
         startTestRun = getattr(result, "startTestRun", None)
         if startTestRun is not None:
             startTestRun()
@@ -128,23 +127,7 @@ class TelemetryTestRunner(unittest.TextTestRunner):
             if stopTestRun is not None:
                 stopTestRun()
 
-        stop_time = datetime.now().timestamp()
-
-        # Output final summary
-        total_tests = result.testsRun
-        passed_tests = (
-            total_tests
-            - len(result.failures)
-            - len(result.errors)
-            - len(result.skipped)
-        )
-        failed_tests = len(result.failures) + len(result.errors)
-        skipped_tests = len(result.skipped)
-
-        self.telemetry_collector.output_test_summary(
-            total_tests, passed_tests, failed_tests, skipped_tests
-        )
-
+        # Summary data is now calculated by analysis tools from individual test records
         return result
 
 

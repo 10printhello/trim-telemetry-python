@@ -1,6 +1,6 @@
-# Trim Telemetry
+# Test Telemetry
 
-Rich test telemetry collection package for Trim. Provides comprehensive instrumentation for Django, pytest, and unittest test frameworks with detailed performance analysis, database query monitoring, coverage tracking, and network call blocking.
+Rich test telemetry collection package for Python test frameworks. Provides comprehensive instrumentation for Django, pytest, and unittest with detailed performance analysis, database query monitoring, and network call detection.
 
 ## Installation
 
@@ -10,15 +10,7 @@ pip install trim-telemetry
 
 ### Optional Dependencies
 
-For enhanced features, install these optional packages:
-
-```bash
-# For code coverage collection
-pip install coverage
-
-# For Django template coverage (if using django_coverage_plugin)
-pip install django_coverage_plugin
-```
+No additional dependencies required. The package works out of the box with standard Python test frameworks.
 
 ### Requirements
 
@@ -26,11 +18,14 @@ pip install django_coverage_plugin
 - Django 3.2+ (for Django integration)
 - pytest 6.0+ (for pytest integration)
 
+### Documentation
+
+- **[README.md](README.md)**: Installation, usage, and examples
+- **[SCHEMA.md](SCHEMA.md)**: Complete schema documentation and field descriptions
+
 ## Usage
 
-### Django Tests (Recommended)
-
-#### **Using the New Test Runner**
+### Django Tests
 
 ```bash
 # Method 1: Direct execution (requires Django environment setup)
@@ -49,7 +44,7 @@ python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner --k
 ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner
 ```
 
-### Pytest Tests (New)
+### Pytest Tests
 
 ```bash
 # Basic usage
@@ -65,7 +60,7 @@ python -m trim_telemetry.pytest tests/
 python -m trim_telemetry.pytest -v --tb=short
 ```
 
-### Unittest Tests (New)
+### Unittest Tests
 
 ```bash
 # Basic usage (auto-discovers tests)
@@ -79,34 +74,24 @@ python -m trim_telemetry.unittest test_models.TestUserModel
 ```
 
 
-### With Trim CLI
+### Docker Usage
 
 ```bash
-# Install the package in your Python environment
-pip install trim-telemetry
+# Django tests in Docker
+docker-compose run --rm django python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner
 
-# Django with new test runner (recommended)
-make collect TEST_COMMAND="python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner"
+# With keepdb for faster runs
+docker-compose run --rm django python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner --keepdb
 
-# Django with direct execution
-make collect TEST_COMMAND="python -m trim_telemetry.django"
-
-# Pytest with new runner
-make collect TEST_COMMAND="python -m trim_telemetry.pytest tests/"
-
-# Unittest with new runner
-make collect TEST_COMMAND="python -m trim_telemetry.unittest"
-
-# Docker Django with new test runner
-make collect TEST_COMMAND="ENVIRONMENT=testing python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner"
-
+# Pytest tests in Docker
+docker-compose run --rm django python -m trim_telemetry.pytest tests/
 ```
 
 ## Architecture
 
-### 🏗️ **New Clean Architecture (Recommended)**
+### 🏗️ **Clean Architecture**
 
-The package now uses a clean, modular architecture organized by framework:
+The package uses a clean, modular architecture organized by framework:
 
 - **`base_telemetry.py`**: Shared telemetry collection logic
 - **`django/`**: Django framework integration
@@ -129,7 +114,7 @@ The package now uses a clean, modular architecture organized by framework:
 ### 🔧 **Advanced Analytics**
 - **Query Type Breakdown**: SELECT, INSERT, UPDATE, DELETE query categorization
 - **Performance Tracking**: Test duration, database query counts, network call counts
-- **Statistical Analysis**: Per-test metrics with clean telemetry output
+- **Clean Output**: Raw telemetry data without judgment calls or complex calculations
 - **Test Status Tracking**: Passed, failed, error, skipped status for each test
 
 ### 🚀 **Framework Support**
@@ -138,14 +123,21 @@ The package now uses a clean, modular architecture organized by framework:
 - **Unittest**: Enhanced unittest runner with telemetry collection
 - **Docker Compatible**: Works seamlessly inside Docker containers
 
+### 📋 **Schema & Documentation**
+- **Versioned Schema**: Each record includes schema version for compatibility
+- **Complete Documentation**: Detailed field descriptions and data types in [SCHEMA.md](SCHEMA.md)
+- **Flattened Structure**: All fields at top level with clear prefixes (`db_`, `net_`)
+- **NDJSON Format**: Newline Delimited JSON for streaming processing
+
 ## Telemetry Data
 
 The package outputs comprehensive structured telemetry data for each test:
 
-### 📊 **Clean Telemetry Structure**
+### 📊 **Flattened Telemetry Structure (Schema v1.0.0)**
 
 ```json
 {
+  "schema_version": "1.0.0",
   "run_id": "run_20250909_143808",
   "id": "test_user_creation (users.tests.test_models.UserTestCase.test_user_creation)",
   "name": "test_user_creation",
@@ -154,44 +146,34 @@ The package outputs comprehensive structured telemetry data for each test:
   "file": "users/tests/test_models.py",
   "line": 0,
   "status": "passed",
-  "duration_ms": 1250,
+  "test_duration_ms": 1250,
   "start_time": "2025-09-09T14:38:15.123456",
   "end_time": "2025-09-09T14:38:16.373456",
   
-  "database": {
-    "count": 15,
-    "total_duration_ms": 245,
-    "queries": [
-      {
-        "sql": "SELECT * FROM users WHERE email = 'test@example.com'",
-        "duration_ms": 156
-      }
-    ],
-    "duplicate_queries": [
-      {
-        "sql": "SELECT id FROM posts WHERE user_id = %s",
-        "count": 3
-      }
-    ],
-    "query_types": {
-      "SELECT": 12,
-      "INSERT": 2, 
-      "UPDATE": 1,
-      "DELETE": 0,
-      "OTHER": 0
-    },
-    "avg_duration_ms": 16,
-    "max_duration_ms": 156
-  },
+  "db_count": 15,
+  "db_total_duration_ms": 245,
+  "db_queries": [
+    {
+      "sql": "SELECT * FROM users WHERE email = 'test@example.com'",
+      "duration_ms": 156
+    }
+  ],
+  "db_duplicate_queries": [
+    {
+      "sql": "SELECT id FROM posts WHERE user_id = %s",
+      "count": 3
+    }
+  ],
+  "db_select_count": 12,
+  "db_insert_count": 2,
+  "db_update_count": 1,
+  "db_delete_count": 0,
+  "db_other_count": 0,
+  "db_avg_duration_ms": 16,
+  "db_max_duration_ms": 156,
   
-  "network": {
-    "total_calls": 0,
-    "urls": []
-  },
-  
-  "test_performance": {
-    "duration_ms": 1250
-  }
+  "net_total_calls": 0,
+  "net_urls": []
 }
 ```
 
@@ -230,10 +212,12 @@ The telemetry data is written to a **`.telemetry/`** folder in the current worki
 
 **File contents (e.g., `run_20250909_143808.ndjson`):**
 ```
-{"run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", "status": "passed", "test_duration_ms": 1250, ...}
-{"run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", "status": "passed", "test_duration_ms": 890, ...}
-{"run_id": "run_20250909_143808", "type": "test_run_summary", "total_tests": 25, "passed_tests": 23, "failed_tests": 2, "skipped_tests": 0, "exit_code": 1}
+{"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", "status": "passed", "test_duration_ms": 1250, ...}
+{"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", "status": "passed", "test_duration_ms": 890, ...}
+{"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_update", "name": "test_user_update", "status": "failed", "test_duration_ms": 2100, ...}
 ```
+
+**Note:** Summary data is calculated by analysis tools from individual test records.
 
 ### **Folder-Based Output Benefits:**
 - **Organized**: All telemetry files in one `.telemetry/` folder
@@ -258,11 +242,14 @@ import (
 )
 
 type TestResult struct {
-    RunID     string `json:"run_id"`
-    ID        string `json:"id"`
-    Name      string `json:"name"`
-    Status    string `json:"status"`
-    Duration  int    `json:"duration_ms"`
+    SchemaVersion     string `json:"schema_version"`
+    RunID            string `json:"run_id"`
+    ID               string `json:"id"`
+    Name             string `json:"name"`
+    Status           string `json:"status"`
+    TestDurationMs   int    `json:"test_duration_ms"`
+    DbCount          int    `json:"db_count"`
+    NetTotalCalls    int    `json:"net_total_calls"`
     // ... other fields
 }
 
@@ -275,8 +262,15 @@ func main() {
             break // End of stream
         }
         
+        // Check schema version
+        if result.SchemaVersion != "1.0.0" {
+            fmt.Printf("Warning: Unsupported schema version %s\n", result.SchemaVersion)
+            continue
+        }
+        
         // Process each test result as it arrives
-        fmt.Printf("Test %s: %s (%dms)\n", result.Name, result.Status, result.Duration)
+        fmt.Printf("Test %s: %s (%dms, %d DB queries, %d network calls)\n", 
+            result.Name, result.Status, result.TestDurationMs, result.DbCount, result.NetTotalCalls)
     }
 }
 ```
@@ -320,7 +314,56 @@ tail -f .telemetry/run_20250909_143808.ndjson | go run analysis.go
 - **net_total_calls**: Number of external HTTP calls made during the test
 - **net_urls**: List of URLs that were called (helps identify unmocked tests)
 
-## Development
+## Schema Documentation
+
+For complete field descriptions, data types, and schema versioning information, see [SCHEMA.md](SCHEMA.md).
+
+### **Key Schema Features:**
+- **Versioned**: Each record includes `schema_version` for compatibility
+- **Flattened**: All fields are at the top level with clear prefixes (`db_`, `net_`)
+- **NDJSON**: Newline Delimited JSON format for streaming processing
+- **Self-describing**: Each record contains all necessary metadata
+
+## Troubleshooting
+
+### Common Issues
+
+**Database connection errors:**
+```bash
+# Use --keepdb flag to reuse existing test databases
+python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner --keepdb
+```
+
+**Tests not discovered:**
+```bash
+# Ensure you're in the correct directory with your test files
+# Check that your test files follow naming conventions (test_*.py)
+```
+
+**Telemetry files not created:**
+```bash
+# Check write permissions in the current directory
+# Ensure the .telemetry/ folder can be created
+```
+
+### Getting Help
+
+- Check the [Schema Documentation](SCHEMA.md) for detailed field descriptions
+- Review the telemetry output format and field meanings
+- Ensure your test framework is supported (Django 3.2+, pytest 6.0+)
+
+## Contributing
+
+We welcome contributions! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
+
+### Development Setup
 
 ```bash
 # Install in development mode
@@ -332,3 +375,17 @@ pytest
 # Format code
 black trim_telemetry/
 ```
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Changelog
+
+### v1.0.0
+- Initial release with flattened schema
+- Support for Django, pytest, and unittest
+- Database query monitoring
+- Network call detection
+- NDJSON output format
+- Schema versioning

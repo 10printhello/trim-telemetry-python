@@ -82,6 +82,7 @@ class BaseTelemetryCollector:
 
         # Create test telemetry with flattened database fields
         test_telemetry = {
+            "schema_version": "1.0.0",
             "run_id": self.run_id,
             "id": test_id,
             "name": getattr(test, "_testMethodName", test_id),
@@ -198,22 +199,3 @@ class BaseTelemetryCollector:
     def output_test_telemetry(self, test_telemetry: Dict[str, Any]):
         """Output test telemetry to .telemetry file."""
         self._write_telemetry(test_telemetry)
-
-    def output_test_summary(
-        self,
-        total_tests: int,
-        passed_tests: int,
-        failed_tests: int,
-        skipped_tests: int = 0,
-    ):
-        """Output test run summary to .telemetry file."""
-        summary_data = {
-            "run_id": self.run_id,
-            "type": "test_run_summary",
-            "total_tests": total_tests,
-            "passed_tests": passed_tests,
-            "failed_tests": failed_tests,
-            "skipped_tests": skipped_tests,
-            "exit_code": 0 if failed_tests == 0 else 1,
-        }
-        self._write_telemetry(summary_data)

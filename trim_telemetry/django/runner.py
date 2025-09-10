@@ -79,17 +79,7 @@ class TelemetryTestRunner(DiscoverRunner):
         # Use standard Django behavior
         result = super().run_tests(test_labels, **kwargs)
 
-        # Output basic summary
-        if hasattr(result, "testsRun"):
-            total_tests = result.testsRun
-            failed_tests = len(result.failures) + len(result.errors)
-            skipped_tests = len(result.skipped) if hasattr(result, "skipped") else 0
-            passed_tests = total_tests - failed_tests - skipped_tests
-
-            self.telemetry_collector.output_test_summary(
-                total_tests, passed_tests, failed_tests, skipped_tests
-            )
-
+        # Summary data is now calculated by analysis tools from individual test records
         return result
 
 
