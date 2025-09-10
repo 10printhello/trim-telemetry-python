@@ -73,7 +73,6 @@ python -m trim_telemetry.unittest test_models test_views
 python -m trim_telemetry.unittest test_models.TestUserModel
 ```
 
-
 ### Docker Usage
 
 ```bash
@@ -102,7 +101,6 @@ The package uses a clean, modular architecture organized by framework:
 - **`unittest/`**: Unittest framework integration
   - **`runner.py`**: Unittest runner with telemetry collection
 
-
 ## Features
 
 ### 🎯 **Rich Telemetry Collection**
@@ -127,6 +125,7 @@ The package uses a clean, modular architecture organized by framework:
 - **Docker Compatible**: Works seamlessly inside Docker containers
 
 ### 📋 **Schema & Documentation**
+
 - **Versioned Schema**: Each record includes schema version for compatibility
 - **Complete Documentation**: Detailed field descriptions and data types in [SCHEMA.md](SCHEMA.md)
 - **Flattened Structure**: All fields at top level with clear prefixes (`db_`, `net_`)
@@ -136,7 +135,7 @@ The package uses a clean, modular architecture organized by framework:
 
 The package outputs comprehensive structured telemetry data for each test:
 
-### 📊 **Flattened Telemetry Structure (Schema v1.0.0)**
+### 📊 **Telemetry Structure (Schema v1.0.0)**
 
 ```json
 {
@@ -218,7 +217,8 @@ The telemetry data is written to a **`.telemetry/`** folder in the current worki
 ```
 
 **File contents (e.g., `run_20250909_143808.ndjson`):**
-```
+
+```json
 {"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", "status": "passed", "test_duration_ms": 1250, ...}
 {"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", "status": "passed", "test_duration_ms": 890, ...}
 {"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_update", "name": "test_user_update", "status": "failed", "test_duration_ms": 2100, ...}
@@ -303,11 +303,13 @@ tail -f .telemetry/run_20250909_143808.ndjson | go run analysis.go
 ### 📈 **Interpreting Telemetry Data**
 
 #### **Test Performance**
+
 - **test_duration_ms**: Test execution time in milliseconds (integer precision)
 - **status**: Test result (passed, failed, error, skipped)
 - **run_id**: Unique identifier to correlate all telemetry from a single test run
 
 #### **Database Analysis**
+
 - **db_count**: Number of database queries executed during the test
 - **db_total_duration_ms**: Total time spent on database queries
 - **db_queries**: Array of all SQL queries executed (for debugging)
@@ -321,6 +323,7 @@ tail -f .telemetry/run_20250909_143808.ndjson | go run analysis.go
 - **db_max_duration_ms**: Slowest query duration in milliseconds
 
 #### **Network Monitoring**
+
 - **net_total_calls**: Number of external HTTP calls made during the test
 - **net_urls**: List of URLs that were called (helps identify unmocked tests)
 
@@ -329,6 +332,7 @@ tail -f .telemetry/run_20250909_143808.ndjson | go run analysis.go
 For complete field descriptions, data types, and schema versioning information, see [SCHEMA.md](SCHEMA.md).
 
 ### **Key Schema Features:**
+
 - **Versioned**: Each record includes `schema_version` for compatibility
 - **Flattened**: All fields are at the top level with clear prefixes (`db_`, `net_`)
 - **NDJSON**: Newline Delimited JSON format for streaming processing
@@ -339,18 +343,21 @@ For complete field descriptions, data types, and schema versioning information, 
 ### Common Issues
 
 **Database connection errors:**
+
 ```bash
 # Use --keepdb flag to reuse existing test databases
 python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner --keepdb
 ```
 
 **Tests not discovered:**
+
 ```bash
 # Ensure you're in the correct directory with your test files
 # Check that your test files follow naming conventions (test_*.py)
 ```
 
 **Telemetry files not created:**
+
 ```bash
 # Check write permissions in the current directory
 # Ensure the .telemetry/ folder can be created
@@ -393,6 +400,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Changelog
 
 ### v1.0.0
+
 - Initial release with flattened schema
 - Support for Django, pytest, and unittest
 - Database query monitoring
