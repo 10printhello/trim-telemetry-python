@@ -67,12 +67,12 @@ The example project generates telemetry data like this:
   "end_time": "2025-09-10T08:16:00.589518",
   "db_queries": [
     {
-      "sql": "SELECT \"demo_app_category\".\"id\", \"demo_app_category\".\"name\", \"demo_app_category\".\"description\"...",
+      "sql_signature": "SELECT \"?\" . \"?\" , \"?\" . \"?\" , \"?\" . \"?\" FROM \"?\" WHERE \"?\" . \"?\" = ?",
       "total_duration_ms": 1,
       "count": 1
     },
     {
-      "sql": "SELECT \"demo_app_product\".\"id\", \"demo_app_product\".\"name\", \"demo_app_product\".\"description\"...",
+      "sql_signature": "SELECT \"?\" . \"?\" , \"?\" . \"?\" , \"?\" . \"?\" FROM \"?\" WHERE \"?\" . \"?\" = ?",
       "total_duration_ms": 1,
       "count": 1
     }
@@ -221,12 +221,12 @@ The package outputs comprehensive structured telemetry data for each test:
   
   "db_queries": [
     {
-      "sql": "SELECT * FROM users WHERE email = 'test@example.com'",
+      "sql_signature": "SELECT * FROM USERS WHERE EMAIL = ?",
       "total_duration_ms": 156,
       "count": 1
     },
     {
-      "sql": "SELECT id FROM posts WHERE user_id = %s",
+      "sql_signature": "SELECT ID FROM POSTS WHERE USER_ID = ?",
       "total_duration_ms": 45,
       "count": 3
     }

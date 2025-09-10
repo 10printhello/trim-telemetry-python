@@ -3,6 +3,7 @@ Django-specific telemetry collection
 """
 
 import urllib.request
+import re
 from django.db import connection, reset_queries
 from ..base_telemetry import BaseTelemetryCollector
 
@@ -14,15 +15,57 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
         super().__init__(run_id)
         self._ensure_query_logging_enabled()
 
+    def _normalize_sql(self, sql: str) -> str:
+        """
+        Normalize SQL for proper duplicate detection.
+        
+        This function:
+        1. Removes extra whitespace and normalizes spacing
+        2. Converts to uppercase for case-insensitive comparison
+        3. Replaces parameter values with placeholders
+        4. Normalizes quoted strings and numbers
+        """
+        if not sql:
+            return ""
+        
+        # Remove extra whitespace and normalize spacing
+        sql = re.sub(r'\s+', ' ', sql.strip())
+        
+        # Replace parameter values with placeholders BEFORE case conversion
+        # Replace string literals with ?
+        sql = re.sub(r"'[^']*'", "'?'", sql)
+        sql = re.sub(r'"[^"]*"', '"?"', sql)
+        
+        # Replace numeric literals with ?
+        sql = re.sub(r'\b\d+\.?\d*\b', '?', sql)
+        
+        # Replace boolean literals with ? (case insensitive)
+        sql = re.sub(r'\btrue\b', '?', sql, flags=re.IGNORECASE)
+        sql = re.sub(r'\bfalse\b', '?', sql, flags=re.IGNORECASE)
+        
+        # Convert to uppercase for case-insensitive comparison
+        sql = sql.upper()
+        
+        # Replace common parameter patterns
+        sql = re.sub(r'=\s*\?', ' = ?', sql)
+        sql = re.sub(r'IN\s*\(\s*\?(\s*,\s*\?)*\s*\)', 'IN (?)', sql)
+        
+        # Normalize whitespace around operators and keywords
+        sql = re.sub(r'\s*=\s*', ' = ', sql)
+        sql = re.sub(r'\s*,\s*', ', ', sql)
+        sql = re.sub(r'\s*\(\s*', ' (', sql)
+        sql = re.sub(r'\s*\)\s*', ') ', sql)
+        
+        # Remove extra spaces
+        sql = re.sub(r'\s+', ' ', sql).strip()
+        
+        return sql
+
     def _ensure_query_logging_enabled(self):
         """Ensure Django query logging is enabled."""
         try:
             # Reset any existing queries
             reset_queries()
-
-            # Note: Django's test runner already enables query logging for tests
-            # We don't need to modify settings.DEBUG as it can interfere with
-            # database setup/teardown behavior
         except Exception:
             # Silently handle errors - telemetry should not break tests
             pass
@@ -91,17 +134,16 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
 
                 total_duration += duration
 
-                # Track duplicate queries (same SQL)
-                sql = query.get("sql", "").upper().strip()
-                sql_signature = sql[:100]  # First 100 chars for signature
+                # Track duplicate queries using normalized SQL
+                sql = query.get("sql", "")
+                sql_signature = self._normalize_sql(sql)
+                
                 if sql_signature in query_signatures:
                     query_signatures[sql_signature]["count"] += 1
                     query_signatures[sql_signature]["total_duration"] += duration
                 else:
                     query_signatures[sql_signature] = {
-                        "sql": query.get("sql", "")[:200] + "..."
-                        if len(query.get("sql", "")) > 200
-                        else query.get("sql", ""),
+                        "sql_signature": sql_signature,  # Store the normalized signature instead of raw SQL
                         "count": 1,
                         "total_duration": duration,
                     }
@@ -110,7 +152,7 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
             all_queries = []
             for signature, data in query_signatures.items():
                 all_queries.append({
-                    "sql": data["sql"],
+                    "sql_signature": signature,  # Use the signature as the key
                     "total_duration_ms": round(data["total_duration"] * 1000),
                     "count": data["count"],
                 })

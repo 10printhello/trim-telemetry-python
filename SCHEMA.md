@@ -45,27 +45,27 @@ Each test execution generates a telemetry record with the following schema:
   "end_time": "2025-09-09T14:38:09.373456",
   "db_queries": [
     {
-      "sql": "SELECT * FROM users WHERE id = 1",
+      "sql_signature": "SELECT * FROM USERS WHERE ID = ?",
       "total_duration_ms": 25,
       "count": 1
     },
     {
-      "sql": "INSERT INTO users (name, email) VALUES ('John', 'john@example.com')",
+      "sql_signature": "INSERT INTO USERS (NAME, EMAIL) VALUES (?, ?)",
       "total_duration_ms": 45,
       "count": 1
     },
     {
-      "sql": "UPDATE users SET last_login = NOW() WHERE id = 1",
+      "sql_signature": "UPDATE USERS SET LAST_LOGIN = NOW() WHERE ID = ?",
       "total_duration_ms": 30,
       "count": 1
     },
     {
-      "sql": "SELECT COUNT(*) FROM posts WHERE user_id = 1",
+      "sql_signature": "SELECT COUNT(*) FROM POSTS WHERE USER_ID = ?",
       "total_duration_ms": 20,
       "count": 1
     },
     {
-      "sql": "SELECT * FROM users WHERE...",
+      "sql_signature": "SELECT * FROM USERS WHERE...",
       "total_duration_ms": 75,
       "count": 3
     }
@@ -152,14 +152,14 @@ These fields are calculated by analysis tools from individual test records:
 
 ```json
 {
-  "sql": "SELECT * FROM users WHERE id = 1",
+  "sql_signature": "SELECT * FROM USERS WHERE ID = ?",
   "total_duration_ms": 25,
   "count": 1
 }
 ```
 
 **Query Object Fields:**
-- `sql`: The SQL query (truncated to 200 characters)
+- `sql_signature`: The normalized SQL query signature (parameter values replaced with ?)
 - `total_duration_ms`: Total duration for all executions of this query in milliseconds
 - `count`: Number of times this query was executed
 
