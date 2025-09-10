@@ -121,18 +121,21 @@ The package now uses a clean, modular architecture organized by framework:
 ## Features
 
 ### 🎯 **Rich Telemetry Collection**
+
 - **Database Query Analysis**: Per-test query isolation, duplicate query identification
 - **Performance Metrics**: Accurate test duration tracking with millisecond precision
 - **Network Call Monitoring**: Captures external API calls for unmocked test detection
 - **Test Isolation**: Accurate per-test metrics without cross-test contamination
 
 ### 🔧 **Advanced Analytics**
+
 - **Query Type Breakdown**: SELECT, INSERT, UPDATE, DELETE query categorization
 - **Performance Tracking**: Test duration, database query counts, network call counts
 - **Statistical Analysis**: Per-test metrics with clean telemetry output
 - **Test Status Tracking**: Passed, failed, error, skipped status for each test
 
 ### 🚀 **Framework Support**
+
 - **Django**: Custom test runner with full Django integration and database monitoring
 - **Pytest**: Comprehensive pytest plugin with rich instrumentation
 - **Unittest**: Enhanced unittest runner with telemetry collection
@@ -198,6 +201,7 @@ The package outputs comprehensive structured telemetry data for each test:
 ### 🎯 **Key Telemetry Features**
 
 #### **Database Query Analysis**
+
 - **Per-test isolation**: Each test shows only its own queries
 - **Query categorization**: Breakdown by SELECT/INSERT/UPDATE/DELETE
 - **Duplicate detection**: Identifies repeated SQL statements
@@ -205,12 +209,14 @@ The package outputs comprehensive structured telemetry data for each test:
 - **Clean output**: No judgment calls, just raw data for analysis
 
 #### **Network Call Monitoring**
+
 - **External call detection**: Captures URLs of external API calls
 - **Unmocked test identification**: Helps identify tests that aren't properly mocked
 - **Simple tracking**: Just captures URLs without timing or blocking
 - **Thread-safe**: Works across multiple test threads
 
 #### **Performance Tracking**
+
 - **Duration precision**: All durations in milliseconds with integer precision
 - **Test status**: Passed, failed, error, skipped status for each test
 - **Run correlation**: Unique run ID to correlate all telemetry from a test run
@@ -221,7 +227,8 @@ The package outputs comprehensive structured telemetry data for each test:
 The telemetry data is written to a **`.telemetry/`** folder in the current working directory. Each test run creates a new file named with the run ID and timestamp in **NDJSON format** (Newline Delimited JSON).
 
 **File structure:**
-```
+
+```text
 .telemetry/
 ├── run_20250909_143808.ndjson
 ├── run_20250909_144512.ndjson
@@ -229,13 +236,15 @@ The telemetry data is written to a **`.telemetry/`** folder in the current worki
 ```
 
 **File contents (e.g., `run_20250909_143808.ndjson`):**
-```
+
+```text
 {"run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", "status": "passed", "duration_ms": 1250, ...}
 {"run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", "status": "passed", "duration_ms": 890, ...}
 {"run_id": "run_20250909_143808", "type": "test_run_summary", "total_tests": 25, "passed_tests": 23, "failed_tests": 2, "skipped_tests": 0, "exit_code": 1}
 ```
 
 ### **Folder-Based Output Benefits:**
+
 - **Organized**: All telemetry files in one `.telemetry/` folder
 - **Multiple Runs**: Each test run gets its own file (no overwrites)
 - **Timestamped**: Files named with run ID and datetime for easy identification
@@ -248,6 +257,7 @@ The telemetry data is written to a **`.telemetry/`** folder in the current worki
 - **Go-friendly**: Perfect for Go's `json.Decoder` with `Decode()` in a loop
 
 ### **Go Integration Example:**
+
 ```go
 package main
 
@@ -282,6 +292,7 @@ func main() {
 ```
 
 ### **Usage with Go Analysis Tool:**
+
 ```bash
 # Run tests (telemetry automatically written to .telemetry/ folder)
 python manage.py test --testrunner=trim_telemetry.django.TelemetryTestRunner
@@ -299,11 +310,13 @@ tail -f .telemetry/run_20250909_143808.ndjson | go run analysis.go
 ### 📈 **Interpreting Telemetry Data**
 
 #### **Test Performance**
+
 - **duration_ms**: Test execution time in milliseconds (integer precision)
 - **status**: Test result (passed, failed, error, skipped)
 - **run_id**: Unique identifier to correlate all telemetry from a single test run
 
 #### **Database Analysis**
+
 - **count**: Number of database queries executed during the test
 - **total_duration_ms**: Total time spent on database queries
 - **query_types**: Breakdown by SELECT/INSERT/UPDATE/DELETE operations
@@ -312,6 +325,7 @@ tail -f .telemetry/run_20250909_143808.ndjson | go run analysis.go
 - **max_duration_ms**: Slowest query duration in milliseconds
 
 #### **Network Monitoring**
+
 - **total_calls**: Number of external HTTP calls made during the test
 - **urls**: List of URLs that were called (helps identify unmocked tests)
 
