@@ -37,12 +37,25 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
         # Store initial query count for this test BEFORE resetting
         initial_count = len(connection.queries)
         self.test_queries[test_id] = initial_count
+        
+        # Start network monitoring
+        self.start_network_monitoring(test_id)
 
         # Reset queries after storing initial count (Django best practice)
         reset_queries()
 
-        # Start network call monitoring for this test
-        self.start_network_monitoring(test_id)
+    def end_test(self, test, status: str, test_id: str = None):
+        """End tracking a Django test and stop network monitoring."""
+        if test_id is None:
+            test_id = str(test)
+            
+        # Call parent end_test method first to collect data
+        result = super().end_test(test, status, test_id)
+        
+        # Stop network monitoring after data collection
+        self.stop_network_monitoring(test_id)
+        
+        return result
 
     def _collect_database_telemetry(self, test_id: str):
         """Collect database telemetry for a Django test."""

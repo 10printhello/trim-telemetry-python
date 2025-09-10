@@ -333,3 +333,269 @@ class OrderAPITest(APITestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
+
+
+class TelemetryDemoTests(TestCase):
+    """Tests designed to generate interesting telemetry data"""
+    
+    def setUp(self):
+        # Create test data
+        self.categories = []
+        for i in range(5):
+            category = Category.objects.create(
+                name=f"Category {i}",
+                description=f"Description for category {i}"
+            )
+            self.categories.append(category)
+        
+        self.products = []
+        for i, category in enumerate(self.categories):
+            for j in range(3):  # 3 products per category
+                product = Product.objects.create(
+                    name=f"Product {i}-{j}",
+                    description=f"Description for product {i}-{j}",
+                    price=Decimal(f'{10 + i * 10 + j}.99'),
+                    category=category,
+                    stock_quantity=5 + j
+                )
+                self.products.append(product)
+
+    def test_duplicate_queries(self):
+        """Test that generates many duplicate queries for telemetry analysis"""
+        # This will generate many SELECT queries for the same products
+        for _ in range(10):  # Run the same query 10 times
+            products = list(Product.objects.filter(category=self.categories[0]))
+            self.assertEqual(len(products), 3)
+        
+        # Generate duplicate queries with different parameters
+        for category in self.categories:
+            for _ in range(3):  # 3 times per category
+                products = list(Product.objects.filter(category=category))
+                self.assertTrue(len(products) > 0)
+
+    def test_long_running_test(self):
+        """Test that takes longer to execute for duration analysis"""
+        import time
+        
+        # Simulate some processing time
+        time.sleep(0.1)  # 100ms delay
+        
+        # Perform multiple database operations
+        for i in range(20):
+            # Create and delete products to generate queries
+            product = Product.objects.create(
+                name=f"Temp Product {i}",
+                description="Temporary product for testing",
+                price=Decimal('1.00'),
+                category=self.categories[0],
+                stock_quantity=1
+            )
+            product.delete()
+        
+        # Verify we still have our original products
+        self.assertEqual(Product.objects.count(), len(self.products))
+
+    def test_complex_database_operations(self):
+        """Test with various database operations (SELECT, INSERT, UPDATE, DELETE)"""
+        # SELECT operations
+        _ = list(Category.objects.all())
+        _ = list(Product.objects.all())
+        
+        # INSERT operations
+        new_category = Category.objects.create(
+            name="New Category",
+            description="A newly created category"
+        )
+        new_product = Product.objects.create(
+            name="New Product",
+            description="A newly created product",
+            price=Decimal('50.00'),
+            category=new_category,
+            stock_quantity=10
+        )
+        
+        # UPDATE operations
+        new_product.price = Decimal('75.00')
+        new_product.save()
+        new_category.name = "Updated Category"
+        new_category.save()
+        
+        # More SELECT operations after updates
+        updated_product = Product.objects.get(pk=new_product.pk)
+        self.assertEqual(updated_product.price, Decimal('75.00'))
+        
+        # DELETE operations
+        new_product.delete()
+        new_category.delete()
+        
+        # Final verification
+        self.assertEqual(Category.objects.count(), len(self.categories))
+        self.assertEqual(Product.objects.count(), len(self.products))
+
+
+class NetworkCallTests(APITestCase):
+    """Tests that make network calls for telemetry monitoring"""
+    
+    def setUp(self):
+        self.category = Category.objects.create(
+            name="Test Category",
+            description="For network testing"
+        )
+        self.product = Product.objects.create(
+            name="Test Product",
+            description="For network testing",
+            price=Decimal('100.00'),
+            category=self.category,
+            stock_quantity=5
+        )
+
+    def test_external_api_call(self):
+        """Test that makes an external API call"""
+        import urllib.request
+        import json
+        
+        # Make a call to a public API (httpbin.org for testing)
+        try:
+            with urllib.request.urlopen('https://httpbin.org/json') as response:
+                data = json.loads(response.read().decode())
+                self.assertIn('slideshow', data)
+        except Exception:
+            # If network is not available, just pass the test
+            # This ensures the test doesn't fail in environments without internet
+            pass
+
+    def test_multiple_network_calls(self):
+        """Test that makes multiple network calls"""
+        import urllib.request
+        import json
+        
+        urls = [
+            'https://httpbin.org/json',
+            'https://httpbin.org/uuid',
+            'https://httpbin.org/user-agent'
+        ]
+        
+        for url in urls:
+            try:
+                with urllib.request.urlopen(url) as response:
+                    data = json.loads(response.read().decode())
+                    self.assertIsInstance(data, dict)
+            except Exception:
+                # If network is not available, just pass the test
+                pass
+
+    def test_database_with_network_calls(self):
+        """Test that combines database operations with network calls"""
+        import urllib.request
+        import json
+        
+        # Database operations
+        products = list(Product.objects.filter(category=self.category))
+        self.assertEqual(len(products), 1)
+        
+        # Network call
+        try:
+            with urllib.request.urlopen('https://httpbin.org/json') as response:
+                data = json.loads(response.read().decode())
+                self.assertIn('slideshow', data)
+        except Exception:
+            pass
+        
+        # More database operations
+        self.product.price = Decimal('150.00')
+        self.product.save()
+        
+        # Another network call
+        try:
+            with urllib.request.urlopen('https://httpbin.org/uuid') as response:
+                data = json.loads(response.read().decode())
+                self.assertIn('uuid', data)
+        except Exception:
+            pass
+
+
+class PerformanceStressTests(TestCase):
+    """Tests designed to stress test performance and generate interesting metrics"""
+    
+    def setUp(self):
+        # Create a large dataset
+        self.categories = []
+        for i in range(10):
+            category = Category.objects.create(
+                name=f"Stress Category {i}",
+                description=f"Category for stress testing {i}"
+            )
+            self.categories.append(category)
+            
+            # Create products for each category
+            for j in range(5):
+                Product.objects.create(
+                    name=f"Stress Product {i}-{j}",
+                    description=f"Product for stress testing {i}-{j}",
+                    price=Decimal(f'{10 + i * 5 + j}.99'),
+                    category=category,
+                    stock_quantity=10 + j
+                )
+
+    def test_large_dataset_queries(self):
+        """Test with large dataset to generate many queries"""
+        # Complex queries that will generate multiple database hits
+        categories_with_products = Category.objects.filter(
+            product__isnull=False
+        ).distinct()
+        
+        for category in categories_with_products:
+            # Multiple queries per category
+            products = list(Product.objects.filter(category=category))
+            expensive_products = list(Product.objects.filter(
+                category=category, 
+                price__gt=Decimal('50.00')
+            ))
+            low_stock_products = list(Product.objects.filter(
+                category=category,
+                stock_quantity__lt=15
+            ))
+            
+            # Verify results
+            self.assertTrue(len(products) > 0)
+            self.assertTrue(len(expensive_products) >= 0)
+            self.assertTrue(len(low_stock_products) >= 0)
+
+    def test_nested_queries(self):
+        """Test with nested queries that generate complex query patterns"""
+        # This will generate many related queries
+        for category in self.categories:
+            products = list(Product.objects.filter(category=category))
+            for product in products:
+                # Nested query for each product
+                related_products = list(Product.objects.filter(
+                    category=product.category,
+                    price__range=(product.price - Decimal('10.00'), product.price + Decimal('10.00'))
+                ))
+                self.assertTrue(len(related_products) > 0)
+
+    def test_bulk_operations(self):
+        """Test with bulk operations to generate interesting query patterns"""
+        # Bulk create
+        new_products = []
+        for i in range(20):
+            new_products.append(Product(
+                name=f"Bulk Product {i}",
+                description=f"Bulk created product {i}",
+                price=Decimal(f'{5 + i}.99'),
+                category=self.categories[0],
+                stock_quantity=1
+            ))
+        
+        Product.objects.bulk_create(new_products)
+        
+        # Bulk update
+        Product.objects.filter(name__startswith='Bulk Product').update(
+            price=Decimal('99.99')
+        )
+        
+        # Bulk delete
+        Product.objects.filter(name__startswith='Bulk Product').delete()
+        
+        # Verify cleanup
+        self.assertEqual(Product.objects.filter(name__startswith='Bulk Product').count(), 0)
