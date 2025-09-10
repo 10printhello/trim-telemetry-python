@@ -80,7 +80,7 @@ class BaseTelemetryCollector:
         database_telemetry = self._collect_database_telemetry(test_id)
         network_telemetry = self._collect_network_telemetry(test_id)
 
-        # Create test telemetry
+        # Create test telemetry with flattened database fields
         test_telemetry = {
             "run_id": self.run_id,
             "id": test_id,
@@ -90,14 +90,30 @@ class BaseTelemetryCollector:
             "file": test.__class__.__module__.replace(".", "/") + ".py",
             "line": 0,
             "status": status,
-            "duration_ms": duration_ms,
+            "test_duration_ms": duration_ms,
             "start_time": datetime.fromtimestamp(start_time).isoformat(),
             "end_time": datetime.fromtimestamp(end_time).isoformat(),
-            "database": database_telemetry,
-            "network": network_telemetry,
-            "test_performance": {
-                "duration_ms": duration_ms,
-            },
+            "db_count": database_telemetry.get("count", 0),
+            "db_total_duration_ms": database_telemetry.get("total_duration_ms", 0),
+            "db_queries": database_telemetry.get("queries", []),
+            "db_duplicate_queries": database_telemetry.get("duplicate_queries", []),
+            "db_select_count": database_telemetry.get("query_types", {}).get(
+                "SELECT", 0
+            ),
+            "db_insert_count": database_telemetry.get("query_types", {}).get(
+                "INSERT", 0
+            ),
+            "db_update_count": database_telemetry.get("query_types", {}).get(
+                "UPDATE", 0
+            ),
+            "db_delete_count": database_telemetry.get("query_types", {}).get(
+                "DELETE", 0
+            ),
+            "db_other_count": database_telemetry.get("query_types", {}).get("OTHER", 0),
+            "db_avg_duration_ms": database_telemetry.get("avg_duration_ms", 0),
+            "db_max_duration_ms": database_telemetry.get("max_duration_ms", 0),
+            "net_total_calls": network_telemetry.get("total_calls", 0),
+            "net_urls": network_telemetry.get("urls", []),
         }
 
         # Clean up test data

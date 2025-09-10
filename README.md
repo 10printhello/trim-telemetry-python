@@ -230,8 +230,8 @@ The telemetry data is written to a **`.telemetry/`** folder in the current worki
 
 **File contents (e.g., `run_20250909_143808.ndjson`):**
 ```
-{"run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", "status": "passed", "duration_ms": 1250, ...}
-{"run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", "status": "passed", "duration_ms": 890, ...}
+{"run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", "status": "passed", "test_duration_ms": 1250, ...}
+{"run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", "status": "passed", "test_duration_ms": 890, ...}
 {"run_id": "run_20250909_143808", "type": "test_run_summary", "total_tests": 25, "passed_tests": 23, "failed_tests": 2, "skipped_tests": 0, "exit_code": 1}
 ```
 
@@ -299,21 +299,26 @@ tail -f .telemetry/run_20250909_143808.ndjson | go run analysis.go
 ### 📈 **Interpreting Telemetry Data**
 
 #### **Test Performance**
-- **duration_ms**: Test execution time in milliseconds (integer precision)
+- **test_duration_ms**: Test execution time in milliseconds (integer precision)
 - **status**: Test result (passed, failed, error, skipped)
 - **run_id**: Unique identifier to correlate all telemetry from a single test run
 
 #### **Database Analysis**
-- **count**: Number of database queries executed during the test
-- **total_duration_ms**: Total time spent on database queries
-- **query_types**: Breakdown by SELECT/INSERT/UPDATE/DELETE operations
-- **duplicate_queries**: Repeated SQL statements within the test
-- **avg_duration_ms**: Average query duration in milliseconds
-- **max_duration_ms**: Slowest query duration in milliseconds
+- **db_count**: Number of database queries executed during the test
+- **db_total_duration_ms**: Total time spent on database queries
+- **db_queries**: Array of all SQL queries executed (for debugging)
+- **db_duplicate_queries**: Array of duplicate queries (same SQL, different parameters)
+- **db_select_count**: Number of SELECT queries
+- **db_insert_count**: Number of INSERT queries
+- **db_update_count**: Number of UPDATE queries
+- **db_delete_count**: Number of DELETE queries
+- **db_other_count**: Number of other query types
+- **db_avg_duration_ms**: Average query duration in milliseconds
+- **db_max_duration_ms**: Slowest query duration in milliseconds
 
 #### **Network Monitoring**
-- **total_calls**: Number of external HTTP calls made during the test
-- **urls**: List of URLs that were called (helps identify unmocked tests)
+- **net_total_calls**: Number of external HTTP calls made during the test
+- **net_urls**: List of URLs that were called (helps identify unmocked tests)
 
 ## Development
 
