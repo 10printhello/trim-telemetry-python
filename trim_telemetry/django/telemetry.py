@@ -4,7 +4,6 @@ Django-specific telemetry collection
 
 import urllib.request
 from django.db import connection, reset_queries
-from django.conf import settings
 from ..base_telemetry import BaseTelemetryCollector
 
 
@@ -35,11 +34,12 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
         if test_id is None:
             test_id = str(test)
 
-        # Reset queries before each test (Django best practice)
-        reset_queries()
+        # Store initial query count for this test BEFORE resetting
+        initial_count = len(connection.queries)
+        self.test_queries[test_id] = initial_count
 
-        # Store initial query count for this test
-        self.test_queries[test_id] = len(connection.queries)
+        # Reset queries after storing initial count (Django best practice)
+        reset_queries()
 
         # Start network call monitoring for this test
         self.start_network_monitoring(test_id)

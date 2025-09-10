@@ -76,8 +76,11 @@ class TelemetryTestRunner(DiscoverRunner):
 
     def run_tests(self, test_labels=None, **kwargs):
         """Run tests with telemetry."""
-        # Use standard Django behavior
-        result = super().run_tests(test_labels, **kwargs)
+        # Build the test suite using Django's standard behavior
+        suite = self.build_suite(test_labels, **kwargs)
+        
+        # Use our custom suite runner with telemetry collection
+        result = self.run_suite(suite, **kwargs)
 
         # Summary data is now calculated by analysis tools from individual test records
         return result
