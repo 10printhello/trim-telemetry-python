@@ -95,7 +95,7 @@ Summary data is calculated by analysis tools from individual test records. The f
 - **failed_tests**: Count of records with `status: "failed"` or `status: "error"`
 - **skipped_tests**: Count of records with `status: "skipped"`
 - **exit_code**: 0 if no failed tests, 1 if any tests failed
-- **total_duration**: Sum of all `test_duration_ms` values
+- **total_duration**: Sum of all test durations (calculated from `start_time` and `end_time`)
 - **avg_duration**: `total_duration / total_tests`
 
 ## Field Descriptions
@@ -197,10 +197,10 @@ Always check the `schema_version` field before processing records:
 **Field Structure**:
 - `schema_version`: "1.0.0"
 - `run_id`: Unique test run identifier
-- `test_duration_ms`: Test execution time
-- `db_*`: Database-related fields (count, queries, types, durations)
-- `net_*`: Network-related fields (calls, URLs)
-- Test metadata: `id`, `name`, `class`, `module`, `file`, `status`, timestamps
+- `start_time`/`end_time`: Test execution timestamps for duration calculation
+- `db_*`: Database-related fields (queries with durations and counts)
+- `net_*`: Network-related fields (URLs)
+- Test metadata: `id`, `name`, `class`, `module`, `file`, `status`
 
 ### Schema Versioning Policy
 

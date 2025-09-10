@@ -274,9 +274,9 @@ The telemetry data is written to a **`.telemetry/`** folder in the current worki
 **File contents (e.g., `run_20250909_143808.ndjson`):**
 
 ```json
-{"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", "status": "passed", "test_duration_ms": 1250, ...}
-{"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", "status": "passed", "test_duration_ms": 890, ...}
-{"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_update", "name": "test_user_update", "status": "failed", "test_duration_ms": 2100, ...}
+{"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_creation", "name": "test_user_creation", "status": "passed", "start_time": "2025-09-09T14:38:15.123456", "end_time": "2025-09-09T14:38:16.373456", ...}
+{"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_deletion", "name": "test_user_deletion", "status": "passed", "start_time": "2025-09-09T14:38:16.500000", "end_time": "2025-09-09T14:38:17.390000", ...}
+{"schema_version": "1.0.0", "run_id": "run_20250909_143808", "id": "test_user_update", "name": "test_user_update", "status": "failed", "start_time": "2025-09-09T14:38:17.500000", "end_time": "2025-09-09T14:38:19.600000", ...}
 ```
 
 **Note:** Summary data is calculated by analysis tools from individual test records.
