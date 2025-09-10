@@ -7,7 +7,7 @@ import time
 import threading
 import os
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 
 
 class BaseTelemetryCollector:
@@ -74,7 +74,6 @@ class BaseTelemetryCollector:
 
         end_time = time.time()
         start_time = self.test_timings.get(test_id, end_time)
-        duration_ms = round((end_time - start_time) * 1000)
 
         # Collect telemetry data
         database_telemetry = self._collect_database_telemetry(test_id)
@@ -131,7 +130,12 @@ class BaseTelemetryCollector:
     def _collect_network_telemetry(self, test_id: str):
         """Collect network telemetry for a test. Override in subclasses."""
         try:
-            network_data = self.test_network_calls.get(test_id, {})
+            network_data = self.test_network_calls.get(test_id)
+            if network_data is None:
+                return {
+                    "urls": [],
+                }
+                
             calls = network_data.get("calls", [])
 
             if not calls:

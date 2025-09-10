@@ -129,34 +129,27 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
             # Store original urllib methods and initialize call tracking
             self.test_network_calls[test_id] = {
                 "calls": [],
-                "original_urlopen": urllib.request.urlopen,
-                "original_request": getattr(urllib.request, "Request", None),
             }
+
+            # Only patch if not already patched
+            if not hasattr(urllib.request, '_trim_telemetry_patched'):
+                # Store the original function globally
+                urllib.request._original_urlopen = urllib.request.urlopen
+                urllib.request._trim_telemetry_patched = True
 
             # Create a simple tracked version that just logs URLs
             def tracked_urlopen(*args, **kwargs):
-                # Only track if this is called during our test's execution
-                if test_id not in self.test_network_calls:
-                    # Fall back to original if test is no longer active
-                    return self.test_network_calls.get(test_id, {}).get(
-                        "original_urlopen", urllib.request.urlopen
-                    )(*args, **kwargs)
-
                 # Just capture the URL - no timing, no blocking
                 url = args[0] if args else kwargs.get("url", "unknown")
                 url_str = str(url)
 
                 # Make the actual call using the original function (no timing)
-                result = self.test_network_calls[test_id]["original_urlopen"](
-                    *args, **kwargs
-                )
+                result = urllib.request._original_urlopen(*args, **kwargs)
 
-                # Log the call (just URL, no duration or status)
-                self.test_network_calls[test_id]["calls"].append(
-                    {
-                        "url": url_str,
-                    }
-                )
+                # Log the call for all active tests
+                for active_test_id, data in self.test_network_calls.items():
+                    if data is not None:  # Check if test is still active
+                        data["calls"].append({"url": url_str})
 
                 return result
 
@@ -171,13 +164,15 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
         """Stop monitoring network calls for a Django test."""
         try:
             if test_id in self.test_network_calls:
-                # Restore original urllib methods
-                network_data = self.test_network_calls[test_id]
-                if "original_urlopen" in network_data:
-                    urllib.request.urlopen = network_data["original_urlopen"]
-
-                # Clean up
-                del self.test_network_calls[test_id]
+                # Mark test as inactive by setting to None
+                self.test_network_calls[test_id] = None
+                
+                # If no active tests remain, restore original function
+                active_tests = [tid for tid, data in self.test_network_calls.items() if data is not None]
+                if not active_tests and hasattr(urllib.request, '_original_urlopen'):
+                    urllib.request.urlopen = urllib.request._original_urlopen
+                    delattr(urllib.request, '_trim_telemetry_patched')
+                    delattr(urllib.request, '_original_urlopen')
         except Exception:
             # Silently handle errors - telemetry should not break tests
             pass
