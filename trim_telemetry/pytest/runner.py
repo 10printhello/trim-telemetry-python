@@ -95,47 +95,8 @@ class PytestTelemetryPlugin:
 
     def pytest_sessionfinish(self, session, exitstatus):
         """Called after test session finishes."""
-        # Count test results from the session
-        total_tests = (
-            session.testscollected if hasattr(session, "testscollected") else 0
-        )
-        passed_tests = (
-            len(
-                [
-                    item
-                    for item in session.items
-                    if hasattr(item, "rep_call") and item.rep_call.passed
-                ]
-            )
-            if hasattr(session, "items")
-            else 0
-        )
-        failed_tests = (
-            len(
-                [
-                    item
-                    for item in session.items
-                    if hasattr(item, "rep_call") and item.rep_call.failed
-                ]
-            )
-            if hasattr(session, "items")
-            else 0
-        )
-        skipped_tests = (
-            len(
-                [
-                    item
-                    for item in session.items
-                    if hasattr(item, "rep_call") and item.rep_call.skipped
-                ]
-            )
-            if hasattr(session, "items")
-            else 0
-        )
-
-        self.telemetry_collector.output_test_summary(
-            total_tests, passed_tests, failed_tests, skipped_tests
-        )
+        # Summary data is now calculated by analysis tools from individual test records
+        pass
 
 
 def main():
