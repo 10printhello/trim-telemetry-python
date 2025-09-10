@@ -23,6 +23,75 @@ No additional dependencies required. The package works out of the box with stand
 - **[README.md](README.md)**: Installation, usage, and examples
 - **[SCHEMA.md](SCHEMA.md)**: Complete schema documentation and field descriptions
 
+## Example Project
+
+We've included a complete Django example project that demonstrates the telemetry package in action. This is the best way to see the package working with real data.
+
+### Quick Start with Example
+
+```bash
+cd trim-telemetry-python/example
+
+# Quick start (builds, starts, migrates, and generates telemetry)
+make quick-start
+
+# Or step by step:
+make dev-setup    # Build, start, and migrate
+make generate     # Generate telemetry data
+make test         # Run test suite
+```
+
+### Example Project Features
+
+- **26 comprehensive tests** covering models, views, and API endpoints
+- **Rich telemetry data** with database queries, performance metrics, and test isolation
+- **Docker Compose setup** for easy development and testing
+- **Makefile targets** for common operations (`make generate`, `make test`, etc.)
+- **Real-world scenarios** including Django REST Framework, pagination, and complex queries
+
+### Example Telemetry Output
+
+The example project generates telemetry data like this:
+
+```json
+{
+  "schema_version": "1.0.0",
+  "run_id": "run_20250910_081600",
+  "id": "test_category_products_endpoint (demo_app.tests.CategoryAPITest.test_category_products_endpoint)",
+  "name": "test_category_products_endpoint",
+  "class": "CategoryAPITest",
+  "module": "demo_app.tests",
+  "file": "demo_app/tests.py",
+  "status": "passed",
+  "start_time": "2025-09-10T08:16:00.509936",
+  "end_time": "2025-09-10T08:16:00.589518",
+  "db_queries": [
+    {
+      "sql": "SELECT \"demo_app_category\".\"id\", \"demo_app_category\".\"name\", \"demo_app_category\".\"description\"...",
+      "total_duration_ms": 1,
+      "count": 1
+    },
+    {
+      "sql": "SELECT \"demo_app_product\".\"id\", \"demo_app_product\".\"name\", \"demo_app_product\".\"description\"...",
+      "total_duration_ms": 1,
+      "count": 1
+    }
+  ],
+  "net_urls": []
+}
+```
+
+### Available Makefile Targets
+
+- `make generate` - Generate telemetry data (runs tests with telemetry collection)
+- `make test` - Run standard Django tests
+- `make test-telemetry` - Run tests with telemetry collection
+- `make telemetry-latest` - Show the latest telemetry file
+- `make telemetry-count` - Count telemetry records
+- `make quick-start` - Complete setup and telemetry generation
+
+For more details, see the [example project README](example/README.md).
+
 ## Usage
 
 ### Django Tests
@@ -146,35 +215,23 @@ The package outputs comprehensive structured telemetry data for each test:
   "class": "UserTestCase", 
   "module": "users.tests.test_models",
   "file": "users/tests/test_models.py",
-  "line": 0,
   "status": "passed",
-  "test_duration_ms": 1250,
   "start_time": "2025-09-09T14:38:15.123456",
   "end_time": "2025-09-09T14:38:16.373456",
   
-  "db_count": 15,
-  "db_total_duration_ms": 245,
   "db_queries": [
     {
       "sql": "SELECT * FROM users WHERE email = 'test@example.com'",
-      "duration_ms": 156
-    }
-  ],
-  "db_duplicate_queries": [
+      "total_duration_ms": 156,
+      "count": 1
+    },
     {
       "sql": "SELECT id FROM posts WHERE user_id = %s",
+      "total_duration_ms": 45,
       "count": 3
     }
   ],
-  "db_select_count": 12,
-  "db_insert_count": 2,
-  "db_update_count": 1,
-  "db_delete_count": 0,
-  "db_other_count": 0,
-  "db_avg_duration_ms": 16,
-  "db_max_duration_ms": 156,
   
-  "net_total_calls": 0,
   "net_urls": []
 }
 ```
@@ -184,9 +241,8 @@ The package outputs comprehensive structured telemetry data for each test:
 #### **Database Query Analysis**
 
 - **Per-test isolation**: Each test shows only its own queries
-- **Query categorization**: Breakdown by SELECT/INSERT/UPDATE/DELETE
-- **Duplicate detection**: Identifies repeated SQL statements
-- **Performance metrics**: Average and maximum query durations in milliseconds
+- **Query aggregation**: Groups identical queries with execution counts
+- **Performance metrics**: Individual query durations in milliseconds
 - **Clean output**: No judgment calls, just raw data for analysis
 
 #### **Network Call Monitoring**
@@ -198,7 +254,6 @@ The package outputs comprehensive structured telemetry data for each test:
 
 #### **Performance Tracking**
 
-- **Duration precision**: All durations in milliseconds with integer precision
 - **Test status**: Passed, failed, error, skipped status for each test
 - **Run correlation**: Unique run ID to correlate all telemetry from a test run
 - **Clean metrics**: No complex calculations, just raw performance data
@@ -256,9 +311,6 @@ type TestResult struct {
     ID               string `json:"id"`
     Name             string `json:"name"`
     Status           string `json:"status"`
-    TestDurationMs   int    `json:"test_duration_ms"`
-    DbCount          int    `json:"db_count"`
-    NetTotalCalls    int    `json:"net_total_calls"`
     // ... other fields
 }
 
@@ -278,8 +330,8 @@ func main() {
         }
         
         // Process each test result as it arrives
-        fmt.Printf("Test %s: %s (%dms, %d DB queries, %d network calls)\n", 
-            result.Name, result.Status, result.TestDurationMs, result.DbCount, result.NetTotalCalls)
+        fmt.Printf("Test %s: %s\n", 
+            result.Name, result.Status)
     }
 }
 ```
@@ -304,27 +356,16 @@ tail -f .telemetry/run_20250909_143808.ndjson | go run analysis.go
 
 #### **Test Performance**
 
-- **test_duration_ms**: Test execution time in milliseconds (integer precision)
 - **status**: Test result (passed, failed, error, skipped)
 - **run_id**: Unique identifier to correlate all telemetry from a single test run
+- **start_time/end_time**: Test execution timestamps for duration calculation
 
 #### **Database Analysis**
 
-- **db_count**: Number of database queries executed during the test
-- **db_total_duration_ms**: Total time spent on database queries
-- **db_queries**: Array of all SQL queries executed (for debugging)
-- **db_duplicate_queries**: Array of duplicate queries (same SQL, different parameters)
-- **db_select_count**: Number of SELECT queries
-- **db_insert_count**: Number of INSERT queries
-- **db_update_count**: Number of UPDATE queries
-- **db_delete_count**: Number of DELETE queries
-- **db_other_count**: Number of other query types
-- **db_avg_duration_ms**: Average query duration in milliseconds
-- **db_max_duration_ms**: Slowest query duration in milliseconds
+- **db_queries**: Array of SQL queries with execution counts and durations
 
 #### **Network Monitoring**
 
-- **net_total_calls**: Number of external HTTP calls made during the test
 - **net_urls**: List of URLs that were called (helps identify unmocked tests)
 
 ## Schema Documentation

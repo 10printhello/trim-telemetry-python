@@ -23,7 +23,7 @@ make quick-start
 # Or step by step:
 make dev-setup    # Build, start, and migrate
 make generate     # Generate telemetry data
-make api-test     # Test API endpoints
+make test         # Run test suite
 ```
 
 ### Manual Setup
@@ -147,8 +147,8 @@ The project includes a comprehensive Makefile with the following targets:
 - `make test-keepdb` - Run tests with keepdb for faster runs
 - `make generate` - Generate telemetry data (alias for test-telemetry)
 
-### API Testing
-- `make api-test` - Test API endpoints with sample requests
+### Testing
+- `make test` - Run the Django test suite
 
 ### Data Management
 - `make migrate` - Run Django migrations
