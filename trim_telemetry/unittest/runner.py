@@ -83,10 +83,8 @@ class TelemetryTestResult(unittest.TextTestResult):
             "name": test_name,
             "class": test_class,
             "module": test_module,
-            "file": test_file,
-            "line": 0,  # unittest doesn't provide line numbers easily
-            "status": status,
-            "duration_ms": duration_ms,
+                "file": test_file,
+                "status": status,
             "start_time": datetime.fromtimestamp(start_time).isoformat(),
             "end_time": datetime.fromtimestamp(end_time).isoformat(),
             "database": self.telemetry_collector._get_empty_database_telemetry(),

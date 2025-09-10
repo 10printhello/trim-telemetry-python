@@ -4,7 +4,6 @@ Django-specific telemetry collection
 
 import urllib.request
 from django.db import connection, reset_queries
-from django.conf import settings
 from ..base_telemetry import BaseTelemetryCollector
 
 
@@ -35,11 +34,12 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
         if test_id is None:
             test_id = str(test)
 
-        # Reset queries before each test (Django best practice)
-        reset_queries()
+        # Store initial query count for this test BEFORE resetting
+        initial_count = len(connection.queries)
+        self.test_queries[test_id] = initial_count
 
-        # Store initial query count for this test
-        self.test_queries[test_id] = len(connection.queries)
+        # Reset queries after storing initial count (Django best practice)
+        reset_queries()
 
         # Start network call monitoring for this test
         self.start_network_monitoring(test_id)
@@ -65,17 +65,9 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
 
             # Analyze queries
             total_duration = 0
-            all_queries = []
-            query_types = {
-                "SELECT": 0,
-                "INSERT": 0,
-                "UPDATE": 0,
-                "DELETE": 0,
-                "OTHER": 0,
-            }
             query_signatures = {}
-            max_duration = 0
 
+            # First pass: collect all queries and track signatures
             for query in test_queries:
                 # Handle both string and numeric duration values
                 duration_raw = query.get("time", 0)
@@ -85,62 +77,33 @@ class DjangoTelemetryCollector(BaseTelemetryCollector):
                     duration = 0
 
                 total_duration += duration
-                max_duration = max(max_duration, duration)
 
-                # Store all queries with their details (no judgment calls)
-                all_queries.append(
-                    {
+                # Track duplicate queries (same SQL)
+                sql = query.get("sql", "").upper().strip()
+                sql_signature = sql[:100]  # First 100 chars for signature
+                if sql_signature in query_signatures:
+                    query_signatures[sql_signature]["count"] += 1
+                    query_signatures[sql_signature]["total_duration"] += duration
+                else:
+                    query_signatures[sql_signature] = {
                         "sql": query.get("sql", "")[:200] + "..."
                         if len(query.get("sql", "")) > 200
                         else query.get("sql", ""),
-                        "duration_ms": round(duration * 1000),
+                        "count": 1,
+                        "total_duration": duration,
                     }
-                )
 
-                # Count query types
-                sql = query.get("sql", "").upper().strip()
-                if sql.startswith("SELECT"):
-                    query_types["SELECT"] += 1
-                elif sql.startswith("INSERT"):
-                    query_types["INSERT"] += 1
-                elif sql.startswith("UPDATE"):
-                    query_types["UPDATE"] += 1
-                elif sql.startswith("DELETE"):
-                    query_types["DELETE"] += 1
-                else:
-                    query_types["OTHER"] += 1
-
-                # Track duplicate queries (same SQL)
-                sql_signature = sql[:100]  # First 100 chars for signature
-                if sql_signature in query_signatures:
-                    query_signatures[sql_signature] += 1
-                else:
-                    query_signatures[sql_signature] = 1
-
-            # Find duplicate queries
-            duplicate_queries = []
-            for signature, count in query_signatures.items():
-                if count > 1:
-                    duplicate_queries.append(
-                        {
-                            "sql": signature + "..."
-                            if len(signature) > 100
-                            else signature,
-                            "count": count,
-                        }
-                    )
-
-            # Calculate averages
-            avg_duration = (total_duration / query_count) if query_count > 0 else 0
+            # Second pass: create query objects with counts
+            all_queries = []
+            for signature, data in query_signatures.items():
+                all_queries.append({
+                    "sql": data["sql"],
+                    "total_duration_ms": round(data["total_duration"] * 1000),
+                    "count": data["count"],
+                })
 
             return {
-                "count": query_count,
-                "total_duration_ms": round(total_duration * 1000),
                 "queries": all_queries,
-                "duplicate_queries": duplicate_queries,
-                "query_types": query_types,
-                "avg_duration_ms": round(avg_duration * 1000),
-                "max_duration_ms": round(max_duration * 1000),
             }
 
         except Exception:

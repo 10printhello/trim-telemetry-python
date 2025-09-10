@@ -89,31 +89,10 @@ class BaseTelemetryCollector:
             "class": test.__class__.__name__,
             "module": test.__class__.__module__,
             "file": test.__class__.__module__.replace(".", "/") + ".py",
-            "line": 0,
             "status": status,
-            "test_duration_ms": duration_ms,
             "start_time": datetime.fromtimestamp(start_time).isoformat(),
             "end_time": datetime.fromtimestamp(end_time).isoformat(),
-            "db_count": database_telemetry.get("count", 0),
-            "db_total_duration_ms": database_telemetry.get("total_duration_ms", 0),
             "db_queries": database_telemetry.get("queries", []),
-            "db_duplicate_queries": database_telemetry.get("duplicate_queries", []),
-            "db_select_count": database_telemetry.get("query_types", {}).get(
-                "SELECT", 0
-            ),
-            "db_insert_count": database_telemetry.get("query_types", {}).get(
-                "INSERT", 0
-            ),
-            "db_update_count": database_telemetry.get("query_types", {}).get(
-                "UPDATE", 0
-            ),
-            "db_delete_count": database_telemetry.get("query_types", {}).get(
-                "DELETE", 0
-            ),
-            "db_other_count": database_telemetry.get("query_types", {}).get("OTHER", 0),
-            "db_avg_duration_ms": database_telemetry.get("avg_duration_ms", 0),
-            "db_max_duration_ms": database_telemetry.get("max_duration_ms", 0),
-            "net_total_calls": network_telemetry.get("total_calls", 0),
             "net_urls": network_telemetry.get("urls", []),
         }
 
@@ -140,19 +119,7 @@ class BaseTelemetryCollector:
     def _get_empty_database_telemetry(self):
         """Return empty database telemetry structure."""
         return {
-            "count": 0,
-            "total_duration_ms": 0,
             "queries": [],
-            "duplicate_queries": [],
-            "query_types": {
-                "SELECT": 0,
-                "INSERT": 0,
-                "UPDATE": 0,
-                "DELETE": 0,
-                "OTHER": 0,
-            },
-            "avg_duration_ms": 0,
-            "max_duration_ms": 0,
         }
 
     def _collect_database_telemetry(self, test_id: str):
@@ -169,18 +136,15 @@ class BaseTelemetryCollector:
 
             if not calls:
                 return {
-                    "total_calls": 0,
                     "urls": [],
                 }
 
             return {
-                "total_calls": len(calls),
                 "urls": [call.get("url", "unknown") for call in calls],
             }
 
         except Exception:
             return {
-                "total_calls": 0,
                 "urls": [],
             }
 

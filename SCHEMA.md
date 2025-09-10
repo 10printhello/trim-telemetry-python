@@ -20,6 +20,7 @@ The `schema_version` field is included in every telemetry record to ensure compa
 ```
 
 Each file contains one JSON object per line, representing:
+
 - **Test telemetry records** - Individual test execution data
 
 Note: Summary data is calculated by analysis tools from individual test records.
@@ -39,33 +40,36 @@ Each test execution generates a telemetry record with the following schema:
   "class": "TestUserCreation",
   "module": "tests.test_user",
   "file": "tests/test_user.py",
-  "line": 0,
   "status": "passed",
-  "test_duration_ms": 1250,
   "start_time": "2025-09-09T14:38:08.123456",
   "end_time": "2025-09-09T14:38:09.373456",
-  "db_count": 5,
-  "db_total_duration_ms": 150,
   "db_queries": [
     {
       "sql": "SELECT * FROM users WHERE id = 1",
-      "duration_ms": 25
-    }
-  ],
-  "db_duplicate_queries": [
+      "total_duration_ms": 25,
+      "count": 1
+    },
+    {
+      "sql": "INSERT INTO users (name, email) VALUES ('John', 'john@example.com')",
+      "total_duration_ms": 45,
+      "count": 1
+    },
+    {
+      "sql": "UPDATE users SET last_login = NOW() WHERE id = 1",
+      "total_duration_ms": 30,
+      "count": 1
+    },
+    {
+      "sql": "SELECT COUNT(*) FROM posts WHERE user_id = 1",
+      "total_duration_ms": 20,
+      "count": 1
+    },
     {
       "sql": "SELECT * FROM users WHERE...",
+      "total_duration_ms": 75,
       "count": 3
     }
   ],
-  "db_select_count": 3,
-  "db_insert_count": 1,
-  "db_update_count": 1,
-  "db_delete_count": 0,
-  "db_other_count": 0,
-  "db_avg_duration_ms": 30,
-  "db_max_duration_ms": 75,
-  "net_total_calls": 2,
   "net_urls": [
     "https://api.example.com/users",
     "https://api.example.com/posts"
@@ -91,7 +95,7 @@ Summary data is calculated by analysis tools from individual test records. The f
 - **failed_tests**: Count of records with `status: "failed"` or `status: "error"`
 - **skipped_tests**: Count of records with `status: "skipped"`
 - **exit_code**: 0 if no failed tests, 1 if any tests failed
-- **total_duration**: Sum of all `test_duration_ms` values
+- **total_duration**: Sum of all test durations (calculated from `start_time` and `end_time`)
 - **avg_duration**: `total_duration / total_tests`
 
 ## Field Descriptions
@@ -112,9 +116,7 @@ Summary data is calculated by analysis tools from individual test records. The f
 | `class` | string | Test class name |
 | `module` | string | Python module name |
 | `file` | string | File path (relative to project root) |
-| `line` | integer | Line number (currently always 0) |
 | `status` | string | Test result: "passed", "failed", "error", "skipped" |
-| `test_duration_ms` | integer | Test execution time in milliseconds |
 | `start_time` | string | Test start time (ISO 8601 format) |
 | `end_time` | string | Test end time (ISO 8601 format) |
 
@@ -122,23 +124,12 @@ Summary data is calculated by analysis tools from individual test records. The f
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `db_count` | integer | Number of database queries executed |
-| `db_total_duration_ms` | integer | Total time spent on database queries |
-| `db_queries` | array | Array of query objects with SQL and duration |
-| `db_duplicate_queries` | array | Array of duplicate query objects |
-| `db_select_count` | integer | Number of SELECT queries |
-| `db_insert_count` | integer | Number of INSERT queries |
-| `db_update_count` | integer | Number of UPDATE queries |
-| `db_delete_count` | integer | Number of DELETE queries |
-| `db_other_count` | integer | Number of other query types |
-| `db_avg_duration_ms` | integer | Average query duration in milliseconds |
-| `db_max_duration_ms` | integer | Longest query duration in milliseconds |
+| `db_queries` | array | Array of query objects with SQL, duration, and count |
 
 ### Network Fields (net_ prefix)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `net_total_calls` | integer | Number of external HTTP calls made |
 | `net_urls` | array | List of URLs that were called |
 
 ### Calculated Summary Fields
@@ -162,18 +153,15 @@ These fields are calculated by analysis tools from individual test records:
 ```json
 {
   "sql": "SELECT * FROM users WHERE id = 1",
-  "duration_ms": 25
+  "total_duration_ms": 25,
+  "count": 1
 }
 ```
 
-### Duplicate Query Object
-
-```json
-{
-  "sql": "SELECT * FROM users WHERE...",
-  "count": 3
-}
-```
+**Query Object Fields:**
+- `sql`: The SQL query (truncated to 200 characters)
+- `total_duration_ms`: Total duration for all executions of this query in milliseconds
+- `count`: Number of times this query was executed
 
 ## Processing Guidelines
 
@@ -209,10 +197,10 @@ Always check the `schema_version` field before processing records:
 **Field Structure**:
 - `schema_version`: "1.0.0"
 - `run_id`: Unique test run identifier
-- `test_duration_ms`: Test execution time
-- `db_*`: Database-related fields (count, queries, types, durations)
-- `net_*`: Network-related fields (calls, URLs)
-- Test metadata: `id`, `name`, `class`, `module`, `file`, `status`, timestamps
+- `start_time`/`end_time`: Test execution timestamps for duration calculation
+- `db_*`: Database-related fields (queries with durations and counts)
+- `net_*`: Network-related fields (URLs)
+- Test metadata: `id`, `name`, `class`, `module`, `file`, `status`
 
 ### Schema Versioning Policy
 
