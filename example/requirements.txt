@@ -3,3 +3,4 @@ djangorestframework==3.14.0
 psycopg2-binary==2.9.9
 python-decouple==3.8
 requests==2.31.0
+git+https://github.com/10printhello/trim-telemetry-python.git
